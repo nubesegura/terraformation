@@ -1,4 +1,9 @@
-# Terraformation
+<p align="center">
+  <img src="../assets/logo.svg" alt="Terraformation" width="560">
+</p>
+
+<h1 align="center">Terraformation</h1>
+
 > 🇬🇧 English version (primary): [../README.md](../README.md)
 
 Visor **serverless** de Terraform states almacenados en un backend remoto **AWS S3**. Es un sucesor

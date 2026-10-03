@@ -89,7 +89,7 @@ class AppShell extends ConsumerWidget {
     ];
 
     final title = Row(children: [
-      Icon(Icons.layers, color: Theme.of(context).colorScheme.primary),
+      Image.asset('assets/icon.png', width: 28, height: 28, semanticLabel: 'Terraformation'),
       const SizedBox(width: 8),
       const Text('Terraformation', style: TextStyle(fontWeight: FontWeight.w700)),
     ]);

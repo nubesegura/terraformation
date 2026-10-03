@@ -110,7 +110,7 @@ class LoginPage extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.all(32),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.layers, size: 48, color: Theme.of(context).colorScheme.primary),
+                Image.asset('assets/icon.png', width: 72, height: 72, semanticLabel: 'Terraformation'),
                 const SizedBox(height: 12),
                 Text('Terraformation', style: Theme.of(context).textTheme.headlineMedium),
                 const SizedBox(height: 4),

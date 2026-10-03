@@ -1,6 +1,12 @@
-# Terraformation
+<p align="center">
+  <img src="assets/logo.svg" alt="Terraformation" width="560">
+</p>
 
-> 🇪🇸 Documentación en español: [docs-es/README.md](docs-es/README.md)
+<h1 align="center">Terraformation</h1>
+
+<p align="center">
+  <a href="docs-es/README.md">🇪🇸 Documentación en español</a>
+</p>
 
 **Serverless** viewer for Terraform states stored in a remote **AWS S3** backend. It is a modern successor,
 focused on S3 only, of [terraboard](https://github.com/camptocamp/terraboard) (unmaintained for years). License
@@ -15,10 +21,19 @@ focused on S3 only, of [terraboard](https://github.com/camptocamp/terraboard) (u
 
 > **Scope**: S3 only. No support for GCS, Terraform Cloud, GitLab, MinIO or DynamoDB lock tables.
 
+## Screenshots
+
+![Dashboard](screenshots/dashboard.png)
+*Dashboard: projects, resources, versions, activity, and breakdowns by type, provider and module.*
+
+![AWS resources view](screenshots/aws-resources.png)
+*AWS resources view: what a state deploys, grouped like a CloudFormation stack. Light and dark themes are supported.*
+
 ---
 
 ## Contents
 
+0. [Screenshots](#screenshots)
 1. [Architecture](#architecture)
 2. [Bucket and lock conventions](#bucket-and-lock-conventions)
 3. [Features (and terraboard equivalents)](#features-and-terraboard-equivalents)
