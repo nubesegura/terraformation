@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Terraformation - Cognito (managed login), HTTP API con authorizer JWT y Lambdas FastAPI
+Description: Terraformation - Cognito (managed login), HTTP API with JWT authorizer and FastAPI Lambdas
 
 Parameters:
   AppName: { Type: String }
@@ -8,8 +8,8 @@ Parameters:
   StateBucketName: { Type: String }
   TableName: { Type: String }
   TableArn: { Type: String }
-  WebDomain: { Type: String, Description: Dominio de CloudFront (sin https://) }
-  ExtraWebOrigin: { Type: String, Default: "", Description: "Origen adicional para desarrollo local (p. ej. http://localhost:8080)" }
+  WebDomain: { Type: String, Description: CloudFront domain (without https://) }
+  ExtraWebOrigin: { Type: String, Default: "", Description: "Additional origin for local development (e.g. http://localhost:8080)" }
   LockAlertMinutes: { Type: Number }
   LogRetentionDays: { Type: Number }
   LogLevel: { Type: String }
@@ -121,7 +121,7 @@ Resources:
       Identifier: terraformation
       Name: Terraformation API
       Scopes:
-        - { ScopeName: plans.write, ScopeDescription: Enviar planes (POST /api/plans) }
+        - { ScopeName: plans.write, ScopeDescription: Submit plans (POST /api/plans) }
 
   PlansClient:
     Type: AWS::Cognito::UserPoolClient
@@ -148,7 +148,7 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_158
-            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+            comment: Encrypted with the key managed by the CloudWatch Logs service; avoids the cost of a KMS CMK
       guard:
         SuppressedRules:
           - CLOUDWATCH_LOG_GROUP_ENCRYPTED
@@ -158,7 +158,7 @@ Resources:
     Properties:
       Description: !Sub "${AppName} ${Environment}"
       CorsConfiguration:
-        # El !If va por elemento (no envolviendo la lista): SAM descarta CorsConfiguration si AllowOrigins es un !If.
+        # The !If goes per element (not wrapping the list): SAM drops CorsConfiguration if AllowOrigins is an !If.
         AllowOrigins:
           - !Sub "https://${WebDomain}"
           - !If [HasExtraOrigin, !Ref ExtraWebOrigin, !Ref "AWS::NoValue"]
@@ -183,7 +183,7 @@ Resources:
         DestinationArn: !GetAtt ApiAccessLogGroup.Arn
         Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","route":"$context.routeKey","status":"$context.status","latency":"$context.responseLatency","sub":"$context.authorizer.claims.sub"}'
 
-  # ------------------------------------------------------------------ Lambda de lectura (FastAPI)
+  # ------------------------------------------------------------------ Read Lambda (FastAPI)
   ApiLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -193,7 +193,7 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_158
-            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+            comment: Encrypted with the key managed by the CloudWatch Logs service; avoids the cost of a KMS CMK
       guard:
         SuppressedRules:
           - CLOUDWATCH_LOG_GROUP_ENCRYPTED
@@ -235,15 +235,15 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_290
-            comment: xray:Put* y bedrock:InvokeModel (modelo configurable) no admiten ARN fijo; solo con los parámetros activados
+            comment: xray:Put* and bedrock:InvokeModel (configurable model) do not support a fixed ARN; only with the parameters enabled
           - id: CKV_AWS_355
-            comment: Resource "*" solo para X-Ray cuando EnableXRay=true
+            comment: Resource "*" only for X-Ray when EnableXRay=true
 
   ApiFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "${AppName}-${Environment}-api"
-      Description: API REST de solo lectura (FastAPI + Mangum)
+      Description: Read-only REST API (FastAPI + Mangum)
       Handler: terraformation.handlers.api.handler
       CodeUri: ../../backend/build/package/
       Role: !GetAtt ApiRole.Arn
@@ -251,8 +251,8 @@ Resources:
         LogFormat: JSON
         LogGroup: !Ref ApiLogGroup
       Events:
-        # Métodos explícitos (no ANY): ANY incluiría OPTIONS y el preflight CORS pasaría por el autorizador
-        # JWT (401). Sin ruta OPTIONS, API Gateway responde el preflight por sí mismo.
+        # Explicit methods (not ANY): ANY would include OPTIONS and the CORS preflight would go through the authorizer
+        # JWT (401). Without an OPTIONS route, API Gateway answers the preflight itself.
         ProxyGet:
           Type: HttpApi
           Properties:
@@ -269,15 +269,15 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_116
-            comment: Función síncrona detrás de API Gateway; no usa DLQ
+            comment: Synchronous function behind API Gateway; no DLQ
           - id: CKV_AWS_117
-            comment: Sin VPC
+            comment: No VPC
           - id: CKV_AWS_173
-            comment: Variables de entorno sin secretos
+            comment: Environment variables hold no secrets
           - id: CKV_AWS_115
-            comment: El límite se aplica con throttling del API
+            comment: The limit is enforced with API throttling
 
-  # ------------------------------------------------------------------ Lambda de escritura de planes (opcional)
+  # ------------------------------------------------------------------ Plan-writing Lambda (optional)
   PlansLogGroup:
     Type: AWS::Logs::LogGroup
     Condition: PlansOn
@@ -288,7 +288,7 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_158
-            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+            comment: Encrypted with the key managed by the CloudWatch Logs service; avoids the cost of a KMS CMK
       guard:
         SuppressedRules:
           - CLOUDWATCH_LOG_GROUP_ENCRYPTED
@@ -320,16 +320,16 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_290
-            comment: xray:Put* no admite restricción por recurso
+            comment: xray:Put* does not support resource-level restriction
           - id: CKV_AWS_355
-            comment: Resource "*" solo para X-Ray cuando EnableXRay=true
+            comment: Resource "*" only for X-Ray when EnableXRay=true
 
   PlansFunction:
     Type: AWS::Serverless::Function
     Condition: PlansOn
     Properties:
       FunctionName: !Sub "${AppName}-${Environment}-plans"
-      Description: POST /api/plans (compatible con terraboard)
+      Description: POST /api/plans (terraboard compatible)
       Handler: terraformation.handlers.plans.handler
       CodeUri: ../../backend/build/package/
       Role: !GetAtt PlansRole.Arn
@@ -351,13 +351,13 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_116
-            comment: Función síncrona detrás de API Gateway
+            comment: Synchronous function behind API Gateway
           - id: CKV_AWS_117
-            comment: Sin VPC
+            comment: No VPC
           - id: CKV_AWS_173
-            comment: Sin secretos
+            comment: No secrets
           - id: CKV_AWS_115
-            comment: El límite se aplica con throttling del API
+            comment: The limit is enforced with API throttling
 
 Outputs:
   ApiUrl: { Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com" }

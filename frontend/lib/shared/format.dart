@@ -1,3 +1,5 @@
+import '../l10n/app_strings.dart';
+
 String _two(int n) => n.toString().padLeft(2, '0');
 
 DateTime? parseIso(String? s) => (s == null || s.isEmpty) ? null : DateTime.tryParse(s)?.toLocal();
@@ -8,15 +10,15 @@ String shortDateTime(String? iso) {
   return '${d.year}-${_two(d.month)}-${_two(d.day)} ${_two(d.hour)}:${_two(d.minute)}';
 }
 
-/// "hace 5 min", "hace 3 h", "hace 2 d".
-String relativeTime(String? iso, {DateTime? now}) {
+/// "5 min ago", "3 h ago", "2 d ago" (or the Spanish equivalents).
+String relativeTime(AppStrings s, String? iso, {DateTime? now}) {
   final d = parseIso(iso);
   if (d == null) return '—';
   final diff = (now ?? DateTime.now()).difference(d);
-  if (diff.inSeconds < 60) return 'hace instantes';
-  if (diff.inMinutes < 60) return 'hace ${diff.inMinutes} min';
-  if (diff.inHours < 48) return 'hace ${diff.inHours} h';
-  return 'hace ${diff.inDays} d';
+  if (diff.inSeconds < 60) return s.justNow;
+  if (diff.inMinutes < 60) return s.agoMinutes(diff.inMinutes);
+  if (diff.inHours < 48) return s.agoHours(diff.inHours);
+  return s.agoDays(diff.inDays);
 }
 
 String formatDuration(int? seconds) {

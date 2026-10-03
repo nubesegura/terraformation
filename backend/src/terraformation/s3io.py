@@ -1,4 +1,4 @@
-"""Acceso a S3: solo GetObject/HeadObject por versión y ListObjectVersions."""
+"""S3 access: only GetObject/HeadObject by version and ListObjectVersions."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ class S3Reader:
         self.bucket = bucket
 
     def head(self, key: str, version_id: str) -> tuple[str, int] | None:
-        """(LastModified ISO, tamaño) o ``None`` si la versión ya no existe."""
+        """(LastModified ISO, size) or ``None`` if the version no longer exists."""
         try:
             r = self.client.head_object(Bucket=self.bucket, Key=key, VersionId=version_id)
         except self.client.exceptions.ClientError as exc:
@@ -46,7 +46,7 @@ class S3Reader:
         return r["Body"].read()
 
     def list_entries(self, prefix: str = "", *, start_after_key: str = "") -> Iterator[VEntry]:
-        """Versiones y delete markers ordenados por key y, dentro del key, de nuevo a antiguo."""
+        """Versions and delete markers ordered by key and, within a key, newest to oldest."""
         kwargs: dict[str, Any] = {"Bucket": self.bucket, "Prefix": prefix}
         if start_after_key:
             kwargs["KeyMarker"] = start_after_key
@@ -78,7 +78,7 @@ class S3Reader:
             yield from batch
 
     def entries_for_key(self, key: str) -> list[VEntry]:
-        """Entradas (nuevo → antiguo) de un key exacto."""
+        """Entries (newest → oldest) of an exact key."""
         return [e for e in self.list_entries(prefix=key) if e.key == key]
 
 

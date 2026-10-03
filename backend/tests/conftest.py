@@ -93,7 +93,7 @@ def ctx(aws, settings):
 
 @pytest.fixture
 def new_ctx(aws, settings):
-    """Crea un Ctx nuevo (caché vacía), como en una invocación nueva."""
+    """Creates a new Ctx (empty cache), as in a new invocation."""
     return lambda: Ctx(settings=settings, store=Store(aws["table"]), s3=S3Reader(aws["s3"], BUCKET))
 
 

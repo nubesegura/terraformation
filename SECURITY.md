@@ -1,9 +1,9 @@
-# Política de seguridad
+# Security policy
 
-Si encuentras una vulnerabilidad, **no abras un issue público**. Usa la
-funcionalidad *Report a vulnerability* de GitHub (Security → Advisories) del
-repositorio, indicando versión, pasos de reproducción e impacto.
+If you find a vulnerability, **do not open a public issue**. Use the
+*Report a vulnerability* feature of GitHub (Security → Advisories) on the
+repository, stating the version, reproduction steps and impact.
 
-Principios de diseño relevantes: mínimo privilegio en IAM, el state crudo nunca
-se guarda en DynamoDB, los atributos sensibles se enmascaran en la ingesta y
-la API exige un JWT de Amazon Cognito.
+Relevant design principles: least privilege in IAM, the raw state is never
+stored in DynamoDB, sensitive attributes are masked at ingestion and
+the API requires an Amazon Cognito JWT.

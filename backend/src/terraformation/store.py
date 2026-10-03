@@ -1,4 +1,4 @@
-"""Acceso a la tabla única de DynamoDB (ver docs/DATA_MODEL.md)."""
+"""Access to the single DynamoDB table (see docs/DATA_MODEL.md)."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ MAX_ATTR_VALUE = 1024
 
 
 def sort_value(last_modified: str, serial: int, version_id: str) -> str:
-    """Orden total de versiones: LastModified, serial, versionId."""
+    """Total order of versions: LastModified, serial, versionId."""
     return f"{last_modified}#{serial:012d}#{version_id}"
 
 
@@ -55,7 +55,7 @@ def now_iso() -> str:
 def build_update(
     fields: dict[str, Any], remove: tuple[str, ...] = (), add: dict[str, Any] | None = None
 ) -> dict[str, Any]:
-    """Arma UpdateExpression con alias para todos los nombres (evita palabras reservadas)."""
+    """Builds the UpdateExpression with aliases for every name (avoids reserved words)."""
     names: dict[str, str] = {}
     values: dict[str, Any] = {}
     parts: list[str] = []
@@ -104,7 +104,7 @@ class Store:
             kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
 
     def _tx(self, ops: list[dict[str, Any]]) -> None:
-        """TransactWriteItems (el cliente del resource ya (de)serializa los valores)."""
+        """TransactWriteItems (the resource client already (de)serializes the values)."""
         prepared = [{name: {**body, "TableName": self.table.name}} for op in ops for name, body in op.items()]
         self.table.meta.client.transact_write_items(TransactItems=prepared)  # type: ignore[arg-type]
 
@@ -126,7 +126,7 @@ class Store:
         summary: StateSummary,
         outputs: int,
     ) -> bool:
-        """Marca la versión como vigente si es más reciente. ``False`` si llegó fuera de orden."""
+        """Marks the version as current if it is newer. ``False`` if it arrived out of order."""
         upd = build_update(
             {
                 "project": ref.project,
@@ -181,7 +181,7 @@ class Store:
         )
 
     def set_lock_summary(self, ref: StateRef, lock: dict[str, Any] | None, state: str) -> None:
-        """Refleja el lock en el resumen (``state``: locked | released)."""
+        """Reflects the lock in the summary (``state``: locked | released)."""
         base = {"project": ref.project, "workspace": ref.workspace, "path": ref.path, "lock_state": state}
         if state == "locked" and lock:
             created = lock.get("created") or lock.get("acquired_at", "")
@@ -204,7 +204,7 @@ class Store:
 
     # ---- versions ------------------------------------------------------------------------
     def list_versions(self, ref: StateRef) -> list[dict[str, Any]]:
-        """Todas las entradas del historial ordenadas de antigua a reciente."""
+        """All history entries ordered oldest to newest."""
         items = self._query_all(
             KeyConditionExpression=Key("PK").eq(ref.pk) & Key("SK").begins_with("VERSION#")
         )
@@ -218,7 +218,7 @@ class Store:
         return "Item" in r
 
     def put_version(self, ref: StateRef, item: dict[str, Any]) -> bool:
-        """Transacción: ítem de versión (idempotente) + contadores. ``False`` si ya existía."""
+        """Transaction: version item (idempotent) + counters. ``False`` if it already existed."""
         lm = item["last_modified"]
         full = {"PK": ref.pk, "SK": ver_sk(lm, item["version_id"]), **item}
         day = day_of(lm)
@@ -283,7 +283,7 @@ class Store:
 
     # ---- resources -----------------------------------------------------------------------
     def sync_resources(self, ref: StateRef, instances: list[Instance], sort: str) -> tuple[int, int]:
-        """Deja los ítems ``RES#`` iguales a ``instances``. Devuelve (escritos, borrados)."""
+        """Leaves the ``RES#`` items equal to ``instances``. Returns (written, deleted)."""
         existing = {
             i["SK"]: i.get("content_hash")
             for i in self._query_all(
@@ -328,7 +328,7 @@ class Store:
         return writes, deletes
 
     def list_resources(self, ref: StateRef) -> list[dict[str, Any]]:
-        """Recursos de la versión vigente (ítems ``RES#``), tal como se guardaron."""
+        """Resources of the current version (``RES#`` items), as stored."""
         return self._query_all(
             KeyConditionExpression=Key("PK").eq(ref.pk) & Key("SK").begins_with("RES#"),
         )

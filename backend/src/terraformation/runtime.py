@@ -1,4 +1,4 @@
-"""Construcción perezosa de clientes y contexto compartido por las Lambdas."""
+"""Lazy construction of clients and context shared by the Lambdas."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def get_s3() -> S3Reader:
 
 
 def get_ctx() -> Ctx:
-    # Ctx lleva una caché por invocación, por eso se crea de nuevo cada vez.
+    # Ctx carries a per-invocation cache, so it is created anew each time.
     return Ctx(settings=get_settings(), store=get_store(), s3=get_s3())
 
 

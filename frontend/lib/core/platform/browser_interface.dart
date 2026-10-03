@@ -3,12 +3,19 @@ abstract class Browser {
   void setSession(String key, String value);
   void removeSession(String key);
 
-  /// URL actual (con query, sin hash).
+  /// Persistent storage (localStorage), used for preferences that must survive the session.
+  String? getLocal(String key);
+  void setLocal(String key, String value);
+
+  /// Sets the `lang` attribute of the HTML document (accessibility and translation tools).
+  void setDocumentLang(String code);
+
+  /// Current URL (with query, without hash).
   Uri get currentUri;
 
-  /// Redirige la pestaña completa a [url].
+  /// Redirects the whole tab to [url].
   void redirect(String url);
 
-  /// Reemplaza la URL visible sin recargar (para quitar `?code=`).
+  /// Replaces the visible URL without reloading (to remove `?code=`).
   void replaceUrl(String path);
 }

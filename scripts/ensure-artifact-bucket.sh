@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Crea (si no existe) el bucket de artefactos de `cloudformation package`, con los controles de
-# seguridad del estándar: block public access, versionado, SSE-KMS (aws/s3) + Bucket Key, ACLs
-# deshabilitadas, TLS obligatorio, lifecycle y tags obligatorios. Idempotente.
+# Creates (if missing) the `cloudformation package` artifacts bucket, with the standard's
+# security controls: block public access, versioning, SSE-KMS (aws/s3) + Bucket Key, ACLs
+# disabled, mandatory TLS, lifecycle and mandatory tags. Idempotent.
 #
-# Uso: ensure-artifact-bucket.sh <bucket> <region> <env-type> [--profile <perfil>]
+# Usage: ensure-artifact-bucket.sh <bucket> <region> <env-type> [--profile <perfil>]
 set -euo pipefail
 
 BUCKET="${1:?bucket}"; REGION="${2:?region}"; ENV_TYPE="${3:?env-type}"; shift 3
 PROFILE_ARGS=("$@")
-case "$BUCKET" in *--*) echo "Nombre de bucket inválido ($BUCKET): ¿falló aws sts get-caller-identity?" >&2; exit 1;; esac
+case "$BUCKET" in *--*) echo "Invalid bucket name ($BUCKET): did aws sts get-caller-identity fail?" >&2; exit 1;; esac
 aws_() { aws --region "$REGION" "${PROFILE_ARGS[@]}" "$@"; }
 
 if aws_ s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
-  echo "Bucket de artefactos ya existe: $BUCKET"
+  echo "Artifacts bucket already exists: $BUCKET"
   exit 0
 fi
 
-echo "Creando bucket de artefactos: $BUCKET ($REGION)"
+echo "Creating artifacts bucket: $BUCKET ($REGION)"
 if [ "$REGION" = "us-east-1" ]; then
   aws_ s3api create-bucket --bucket "$BUCKET" --object-ownership BucketOwnerEnforced >/dev/null
 else
@@ -46,4 +46,4 @@ aws_ s3api put-bucket-tagging --bucket "$BUCKET" --tagging "TagSet=[
   {Key=team-owner,Value=nube-segura},{Key=project-name,Value=terraformation},
   {Key=app-name,Value=terraformation},{Key=repo-name,Value=terraformation},
   {Key=env-type,Value=$ENV_TYPE}]"
-echo "Bucket de artefactos listo: $BUCKET"
+echo "Artifacts bucket ready: $BUCKET"

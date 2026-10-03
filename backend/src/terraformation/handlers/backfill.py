@@ -1,4 +1,4 @@
-"""Backfill inicial: recorre todas las versiones de .tfstate y .tflock del bucket."""
+"""Initial backfill: walks every .tfstate and .tflock version in the bucket."""
 
 from __future__ import annotations
 

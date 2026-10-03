@@ -34,7 +34,7 @@ def test_lock_created_marks_locked(aws, ctx, fixture_json):
     summ = plain(ctx.store.get_summary(REF))
     assert summ["lock_state"] == "locked" and summ["GSI2PK"] == "LOCKED"
     assert summ["lock_who"] == "ana@laptop"
-    # no genera historial de states
+    # does not generate state history
     assert not [i for i in aws["table"].scan()["Items"] if i["SK"].startswith("VERSION#")]
 
 
@@ -54,7 +54,7 @@ def test_lock_deleted_marks_released_and_keeps_history(aws, ctx, fixture_json):
 def test_duplicate_and_out_of_order_events_converge(aws, ctx, fixture_json):
     v1 = acquire(aws, lock_body(fixture_json))
     marker = release(aws)
-    # primero llega el evento de borrado y luego el de creación (y duplicados)
+    # the delete event arrives first and then the create one (and duplicates)
     d = s3_event("Object Deleted", KEY, marker, **{"deletion-type": "Delete Marker Created"})
     c = s3_event("Object Created", KEY, v1)
     for ev in (d, c, c, d):
@@ -81,7 +81,7 @@ def test_lifecycle_permanent_delete_does_not_release(aws, ctx, fixture_json):
     release(aws)
     new = acquire(aws, lock_body(fixture_json, ID="active"))
     process_lock_event(ctx, s3_event("Object Created", KEY, new))
-    # expira la versión no actual antigua
+    # the old non-current version expires
     aws["s3"].delete_object(Bucket=BUCKET, Key=KEY, VersionId=old)
     ev = s3_event(
         "Object Deleted",
@@ -91,7 +91,7 @@ def test_lifecycle_permanent_delete_does_not_release(aws, ctx, fixture_json):
     )
     assert process_lock_event(ctx, ev) == "locked"
     assert current(ctx)["status"] == "LOCKED"
-    assert len(ctx.store.list_locks(REF)) >= 1  # el historial persiste aunque S3 ya no lo tenga
+    assert len(ctx.store.list_locks(REF)) >= 1  # the history persists even if S3 no longer has it
 
 
 def test_force_unlock_by_deleting_current_version(aws, ctx, fixture_json):

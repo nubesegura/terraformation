@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: Terraformation - ingesta dirigida por eventos (EventBridge), locks, backfill y reconciliación
+Description: Terraformation - event-driven ingestion (EventBridge), locks, backfill and reconciliation
 
 Parameters:
   AppName: { Type: String }
@@ -53,7 +53,7 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_158
-            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+            comment: Encrypted with the key managed by the CloudWatch Logs service; avoids the cost of a KMS CMK
       guard:
         SuppressedRules:
           - CLOUDWATCH_LOG_GROUP_ENCRYPTED
@@ -66,7 +66,7 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_158
-            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+            comment: Encrypted with the key managed by the CloudWatch Logs service; avoids the cost of a KMS CMK
       guard:
         SuppressedRules:
           - CLOUDWATCH_LOG_GROUP_ENCRYPTED
@@ -79,7 +79,7 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_158
-            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+            comment: Encrypted with the key managed by the CloudWatch Logs service; avoids the cost of a KMS CMK
       guard:
         SuppressedRules:
           - CLOUDWATCH_LOG_GROUP_ENCRYPTED
@@ -92,7 +92,7 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_158
-            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+            comment: Encrypted with the key managed by the CloudWatch Logs service; avoids the cost of a KMS CMK
       guard:
         SuppressedRules:
           - CLOUDWATCH_LOG_GROUP_ENCRYPTED
@@ -105,12 +105,12 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_158
-            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+            comment: Encrypted with the key managed by the CloudWatch Logs service; avoids the cost of a KMS CMK
       guard:
         SuppressedRules:
           - CLOUDWATCH_LOG_GROUP_ENCRYPTED
 
-  # ------------------------------------------------------------------ roles (mínimo privilegio)
+  # ------------------------------------------------------------------ roles (least privilege)
   IngestRole:
     Type: AWS::IAM::Role
     Properties:
@@ -146,9 +146,9 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_290
-            comment: xray:Put* no admite restricción por recurso
+            comment: xray:Put* does not support resource-level restriction
           - id: CKV_AWS_355
-            comment: xray:Put* requiere Resource "*" (solo si EnableXRay=true)
+            comment: xray:Put* requires Resource "*" (only if EnableXRay=true)
 
   LockRole:
     Type: AWS::IAM::Role
@@ -185,9 +185,9 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_290
-            comment: xray:Put* no admite restricción por recurso
+            comment: xray:Put* does not support resource-level restriction
           - id: CKV_AWS_355
-            comment: xray:Put* requiere Resource "*" (solo si EnableXRay=true)
+            comment: xray:Put* requires Resource "*" (only if EnableXRay=true)
 
   BackfillRole:
     Type: AWS::IAM::Role
@@ -227,9 +227,9 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_290
-            comment: xray:Put* no admite restricción por recurso
+            comment: xray:Put* does not support resource-level restriction
           - id: CKV_AWS_355
-            comment: xray:Put* requiere Resource "*" (solo si EnableXRay=true)
+            comment: xray:Put* requires Resource "*" (only if EnableXRay=true)
 
   ReconcileRole:
     Type: AWS::IAM::Role
@@ -269,9 +269,9 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_290
-            comment: xray:Put* no admite restricción por recurso
+            comment: xray:Put* does not support resource-level restriction
           - id: CKV_AWS_355
-            comment: xray:Put* requiere Resource "*" (solo si EnableXRay=true)
+            comment: xray:Put* requires Resource "*" (only if EnableXRay=true)
 
   NotificationsRole:
     Type: AWS::IAM::Role
@@ -293,12 +293,12 @@ Resources:
                 Action: [s3:GetBucketNotification, s3:PutBucketNotification]
                 Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
 
-  # ------------------------------------------------------------------ funciones
+  # ------------------------------------------------------------------ functions
   IngestFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "${AppName}-${Environment}-ingest"
-      Description: Ingesta idempotente de versiones de .tfstate (eventos Object Created/Deleted)
+      Description: Idempotent ingestion of .tfstate versions (Object Created/Deleted events)
       Handler: terraformation.handlers.state_ingest.handler
       CodeUri: ../../backend/build/package/
       Role: !GetAtt IngestRole.Arn
@@ -316,19 +316,19 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_116
-            comment: El DLQ se configura vía EventInvokeConfig (OnFailure) y en el target de EventBridge
+            comment: The DLQ is configured via EventInvokeConfig (OnFailure) and on the EventBridge target
           - id: CKV_AWS_117
-            comment: La función no necesita VPC; solo accede a servicios AWS públicos
+            comment: The function does not need a VPC; it only accesses public AWS services
           - id: CKV_AWS_173
-            comment: Variables de entorno sin secretos
+            comment: Environment variables hold no secrets
           - id: CKV_AWS_115
-            comment: Concurrencia reservada opcional por parámetro (cuentas nuevas no pueden reservar)
+            comment: Reserved concurrency is optional via parameter (new accounts cannot reserve)
 
   LockFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "${AppName}-${Environment}-locks"
-      Description: Estado e historial de locking a partir de los .tflock
+      Description: Locking state and history derived from the .tflock files
       Handler: terraformation.handlers.lock_ingest.handler
       CodeUri: ../../backend/build/package/
       Role: !GetAtt LockRole.Arn
@@ -346,19 +346,19 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_116
-            comment: El DLQ se configura vía EventInvokeConfig (OnFailure) y en el target de EventBridge
+            comment: The DLQ is configured via EventInvokeConfig (OnFailure) and on the EventBridge target
           - id: CKV_AWS_117
-            comment: La función no necesita VPC
+            comment: The function does not need a VPC
           - id: CKV_AWS_173
-            comment: Variables de entorno sin secretos
+            comment: Environment variables hold no secrets
           - id: CKV_AWS_115
-            comment: Sin concurrencia reservada para no consumir el mínimo no reservado de la cuenta
+            comment: No reserved concurrency so the account's unreserved minimum is not consumed
 
   BackfillFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "${AppName}-${Environment}-backfill"
-      Description: Backfill inicial de versiones de .tfstate y .tflock (se auto-reinvoca)
+      Description: Initial backfill of .tfstate and .tflock versions (self-reinvokes)
       Handler: terraformation.handlers.backfill.handler
       CodeUri: ../../backend/build/package/
       Role: !GetAtt BackfillRole.Arn
@@ -374,19 +374,19 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_116
-            comment: DLQ vía EventInvokeConfig (OnFailure)
+            comment: DLQ via EventInvokeConfig (OnFailure)
           - id: CKV_AWS_117
-            comment: La función no necesita VPC
+            comment: The function does not need a VPC
           - id: CKV_AWS_173
-            comment: Variables de entorno sin secretos
+            comment: Environment variables hold no secrets
           - id: CKV_AWS_115
-            comment: Función de uso puntual; sin concurrencia reservada
+            comment: One-off function; no reserved concurrency
 
   ReconcileFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "${AppName}-${Environment}-reconcile"
-      Description: Reconciliación periódica (red de seguridad) contra las versiones de S3
+      Description: Periodic reconciliation (safety net) against the S3 versions
       Handler: terraformation.handlers.reconcile.handler
       CodeUri: ../../backend/build/package/
       Role: !GetAtt ReconcileRole.Arn
@@ -402,20 +402,20 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_116
-            comment: DLQ vía EventInvokeConfig (OnFailure)
+            comment: DLQ via EventInvokeConfig (OnFailure)
           - id: CKV_AWS_117
-            comment: La función no necesita VPC
+            comment: The function does not need a VPC
           - id: CKV_AWS_173
-            comment: Variables de entorno sin secretos
+            comment: Environment variables hold no secrets
           - id: CKV_AWS_115
-            comment: Ejecución semanal; sin concurrencia reservada
+            comment: Weekly execution; no reserved concurrency
 
-  # ------------------------------------------------------------------ reglas de EventBridge
+  # ------------------------------------------------------------------ EventBridge rules
   StateRule:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub "${AppName}-${Environment}-tfstate"
-      Description: Object Created/Deleted de los .tfstate → Lambda de ingesta
+      Description: Object Created/Deleted of the .tfstate files → ingestion Lambda
       State: ENABLED
       EventPattern:
         source: [aws.s3]
@@ -434,7 +434,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub "${AppName}-${Environment}-tflock"
-      Description: Object Created/Deleted de los .tflock → Lambda de locks
+      Description: Object Created/Deleted of the .tflock files → locks Lambda
       State: ENABLED
       EventPattern:
         source: [aws.s3]
@@ -481,7 +481,7 @@ Resources:
               ArnEquals:
                 aws:SourceArn: [!GetAtt StateRule.Arn, !GetAtt LockRule.Arn]
 
-  # ------------------------------------------------------------------ reconciliación semanal
+  # ------------------------------------------------------------------ weekly reconciliation
   SchedulerRole:
     Type: AWS::IAM::Role
     Properties:
@@ -505,7 +505,7 @@ Resources:
     Type: AWS::Scheduler::Schedule
     Properties:
       Name: !Sub "${AppName}-${Environment}-reconcile"
-      Description: Reconciliación de baja frecuencia (solo red de seguridad)
+      Description: Low-frequency reconciliation (safety net only)
       State: !If [ScheduleOn, ENABLED, DISABLED]
       ScheduleExpression: !Ref ReconcileSchedule
       FlexibleTimeWindow: { Mode: "OFF" }
@@ -516,13 +516,13 @@ Resources:
         RetryPolicy: { MaximumRetryAttempts: 2, MaximumEventAgeInSeconds: 3600 }
         DeadLetterConfig: { Arn: !Ref DlqArn }
 
-  # ------------------------------------------------------------------ activación de EventBridge en el bucket
+  # ------------------------------------------------------------------ EventBridge activation on the bucket
   NotificationsFunction:
     Type: AWS::Serverless::Function
     Condition: ManageNotifications
     Properties:
       FunctionName: !Sub "${AppName}-${Environment}-bucket-notifications"
-      Description: Custom resource que habilita EventBridge preservando la configuración existente del bucket
+      Description: Custom resource that enables EventBridge while preserving the bucket's existing configuration
       Handler: terraformation.handlers.bucket_notifications.handler
       CodeUri: ../../backend/build/package/
       Role: !GetAtt NotificationsRole.Arn
@@ -535,13 +535,13 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_116
-            comment: Custom resource de ejecución única; los fallos se reportan a CloudFormation
+            comment: One-shot custom resource; failures are reported to CloudFormation
           - id: CKV_AWS_117
-            comment: Sin VPC
+            comment: No VPC
           - id: CKV_AWS_173
-            comment: Sin secretos
+            comment: No secrets
           - id: CKV_AWS_115
-            comment: Ejecución puntual
+            comment: One-off execution
 
   EnableEventBridge:
     Type: Custom::StateBucketEventBridge

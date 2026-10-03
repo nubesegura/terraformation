@@ -2,7 +2,7 @@
  "schema_version": 1,
  "reviewed_at": "2026-10-03",
  "stale_after_days": 180,
- "_doc": "Mapa curado Terraform -> recursos AWS (tipos de CloudFormation). Ver docs/AWS_MAP.md. Lo que no este aqui se muestra como 'Sin mapear'; nunca se adivina.",
+ "_doc": "Curated Terraform -> AWS resources map (CloudFormation types). See docs/AWS_MAP.md. Anything not listed here is shown as 'Unmapped'; nothing is ever guessed.",
  "entries": {
   "aws_acm_certificate": {
    "role": "primary",

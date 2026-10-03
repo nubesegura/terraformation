@@ -1,4 +1,4 @@
-"""Grafo de dependencias entre recursos y entre módulos."""
+"""Dependency graph between resources and between modules."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from terraformation.parser import strip_instance_keys
 
 
 def _module_of(address: str) -> str:
-    """Módulo (sin claves) de una dirección de recurso/módulo."""
+    """Module (without keys) of a resource/module address."""
     parts = strip_instance_keys(address).split(".")
     mod: list[str] = []
     i = 0
@@ -38,7 +38,7 @@ def build_graph(state: ParsedState) -> Graph:
             target = strip_instance_keys(dep)
             if target not in nodes:
                 if not target.startswith("module."):
-                    continue  # referencia a algo que no está en el state
+                    continue  # reference to something that is not in the state
                 nodes[target] = GraphNode(id=target, kind="module", name=target, module=_module_of(target))
             if target != inst.base_address:
                 edges.add((inst.base_address, target))

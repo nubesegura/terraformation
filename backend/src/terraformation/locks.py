@@ -1,7 +1,7 @@
-"""Reconstrucción del estado de locking a partir de las versiones del .tflock en S3.
+"""Rebuilds the locking state from the .tflock versions in S3.
 
-Los eventos solo *disparan* el proceso; la verdad es ``ListObjectVersions`` (D13):
-una versión más reciente ⇒ bloqueado, un delete marker más reciente ⇒ liberado.
+Events only *trigger* the process; the truth is ``ListObjectVersions`` (D13):
+a newer version ⇒ locked, a newer delete marker ⇒ released.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ def read_lock(ctx: Ctx, key: str, version_id: str) -> LockInfo:
 def reconcile_lock(
     ctx: Ctx, ref: StateRef, key: str, entries: list[VEntry], *, event_time: str | None = None
 ) -> str:
-    """``entries``: entradas del key (nuevo → antiguo). Devuelve locked | released | none."""
+    """``entries``: entries of the key (newest → oldest). Returns locked | released | none."""
     st = ctx.store
     asc = list(reversed(entries))
     history = {h["version_id"]: h for h in st.list_locks(ref)}
@@ -71,7 +71,7 @@ def reconcile_lock(
 
     latest = next((e for e in entries if e.is_latest), entries[0] if entries else None)
     if latest is None:
-        # No queda ningún objeto: si había un lock activo, se liberó (p. ej. borrado de versión).
+        # No object is left: if there was an active lock, it was released (e.g. version deleted).
         prev = st.table.get_item(Key={"PK": ref.pk, "SK": "LOCK#CURRENT"}).get("Item")
         if not prev:
             return "none"

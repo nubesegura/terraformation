@@ -17,7 +17,7 @@ node_modules/
 # Python
 *.egg-info/
 
-# Secretos y datos sensibles: nunca versionar
+# Secrets and sensitive data: never commit
 .env
 .env.*
 !.env.example
@@ -32,3 +32,11 @@ node_modules/
 *.tfstate.*
 !backend/tests/fixtures/*.tfstate
 credentials
+
+# Local-only notes (never commit)
+local/
+CLAUDE.md
+.claude/
+.mcp.json
+AGENTS.md
+.cursor*

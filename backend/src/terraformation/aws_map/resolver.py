@@ -1,9 +1,9 @@
-"""Agrupa las instancias de un state en recursos AWS. Falla seguro: lo dudoso va a "sin mapear".
+"""Groups the instances of a state into AWS resources. Fails safe: anything doubtful goes to "unmapped".
 
-Reglas:
-* Nunca se empareja por nombre ni por parecido: solo por las reglas explícitas del mapa.
-* Todo recurso gestionado queda en exactamente un grupo: recurso AWS, sin mapear, helper o dato.
-* Si el mapa no está disponible, ningún recurso gestionado se considera mapeado.
+Rules:
+* Never matched by name or similarity: only by the map's explicit rules.
+* Every managed resource ends up in exactly one group: AWS resource, unmapped, helper or data.
+* If the map is unavailable, no managed resource is considered mapped.
 """
 
 from __future__ import annotations
@@ -15,12 +15,12 @@ from typing import Any
 from terraformation.aws_map.loader import MapEntry, ResourceMap
 from terraformation.masking import MASK
 
-# Proveedores que no crean infraestructura AWS (utilidades). Se listan aparte, no se ocultan.
+# Providers that do not create AWS infrastructure (utilities). Listed separately, not hidden.
 HELPER_PROVIDERS = frozenset(
     {"random", "time", "null", "local", "tls", "archive", "external", "template", "http", "cloudinit"}
 )
 
-# Motivos de "sin mapear"
+# Reasons for "unmapped"
 NO_RULE = "no_rule"
 NON_AWS_PROVIDER = "non_aws_provider"
 MISSING_IDENTITY = "missing_identity"
@@ -124,12 +124,12 @@ def _unmapped(item: dict[str, Any], reason: str, detail: str = "") -> Unmapped:
     return Unmapped(item.get("address", ""), item.get("type", ""), reason, detail, item.get("module", "root"))
 
 
-# tipo de Terraform -> [(atributos, grupo raíz)] de los recursos ya resueltos
+# Terraform type -> [(attributes, root group)] of the already resolved resources
 _Registry = dict[str, list[tuple[dict[str, str], AwsGroup]]]
 
 
 def _find_parent_group(node: _Node, registry: _Registry) -> tuple[AwsGroup | None, str]:
-    """Grupo raíz del padre. ``(None, "")`` = aún sin resolver; ``(None, motivo)`` = definitivo."""
+    """Root group of the parent. ``(None, "")`` = not resolved yet; ``(None, reason)`` = final."""
     rule = node.entry.parent
     assert rule is not None
     value = _usable((node.item.get("attrs") or {}).get(rule.child_attr))
@@ -154,9 +154,9 @@ def _resolve_children(out: Resolution, children: list[_Node], registry: _Registr
             group, reason = _find_parent_group(node, registry)
             if reason:
                 detail = (
-                    "el atributo de enlace no tiene valor utilizable"
+                    "the link attribute has no usable value"
                     if reason == MISSING_PARENT_REF
-                    else "el padre coincide con más de un recurso"
+                    else "the parent matches more than one resource"
                 )
                 out.unmapped.append(_unmapped(node.item, reason, detail))
             elif group is None:
@@ -175,12 +175,12 @@ def _resolve_children(out: Resolution, children: list[_Node], registry: _Registr
         rule = node.entry.parent
         parent_type = rule.type if rule else "?"
         out.unmapped.append(
-            _unmapped(node.item, ORPHAN_CHILD, f"no se encontró el padre ({parent_type}) en este state")
+            _unmapped(node.item, ORPHAN_CHILD, f"parent ({parent_type}) not found in this state")
         )
 
 
 def resolve(items: list[dict[str, Any]], rmap: ResourceMap) -> Resolution:
-    """``items``: ítems RES# (address, type, name, module, provider, mode, attrs)."""
+    """``items``: RES# items (address, type, name, module, provider, mode, attrs)."""
     out = Resolution()
     groups: dict[tuple[str, str], AwsGroup] = {}
     registry: _Registry = {}
@@ -199,7 +199,7 @@ def resolve(items: list[dict[str, Any]], rmap: ResourceMap) -> Resolution:
             out.unmapped.append(_unmapped(item, NON_AWS_PROVIDER, provider or "proveedor desconocido"))
             continue
         if not rmap.usable:
-            out.unmapped.append(_unmapped(item, MAP_UNAVAILABLE, "el mapa no se pudo cargar"))
+            out.unmapped.append(_unmapped(item, MAP_UNAVAILABLE, "the map could not be loaded"))
             continue
         tf_type = item.get("type", "")
         if tf_type in rmap.invalid:
@@ -207,7 +207,7 @@ def resolve(items: list[dict[str, Any]], rmap: ResourceMap) -> Resolution:
             continue
         entry = rmap.entries.get(tf_type)
         if entry is None:
-            out.unmapped.append(_unmapped(item, NO_RULE, "tipo sin regla en el mapa"))
+            out.unmapped.append(_unmapped(item, NO_RULE, "type has no rule in the map"))
             continue
         attrs = item.get("attrs") or {}
         if entry.role == "child":
@@ -216,7 +216,7 @@ def resolve(items: list[dict[str, Any]], rmap: ResourceMap) -> Resolution:
         identity = _first(attrs, entry.identity)
         if identity is None or entry.cfn_type is None:
             out.unmapped.append(
-                _unmapped(item, MISSING_IDENTITY, f"sin valor utilizable en {', '.join(entry.identity)}")
+                _unmapped(item, MISSING_IDENTITY, f"no usable value in {', '.join(entry.identity)}")
             )
             continue
         key = (entry.cfn_type, identity)

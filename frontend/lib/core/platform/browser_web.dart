@@ -27,6 +27,29 @@ class WebBrowser implements Browser {
   }
 
   @override
+  String? getLocal(String key) {
+    try {
+      return web.window.localStorage.getItem(key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  void setLocal(String key, String value) {
+    try {
+      web.window.localStorage.setItem(key, value);
+    } catch (_) {}
+  }
+
+  @override
+  void setDocumentLang(String code) {
+    try {
+      web.document.documentElement?.setAttribute('lang', code);
+    } catch (_) {}
+  }
+
+  @override
   Uri get currentUri => Uri.parse(web.window.location.href);
 
   @override

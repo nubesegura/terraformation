@@ -1,4 +1,4 @@
-"""Lambda de la API de lectura (FastAPI + Mangum) detrás de API Gateway HTTP API."""
+"""Read API Lambda (FastAPI + Mangum) behind an API Gateway HTTP API."""
 
 from __future__ import annotations
 

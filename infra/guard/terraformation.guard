@@ -1,4 +1,4 @@
-# Reglas cfn-guard del proyecto (se ejecutan con `make guard`).
+# Project cfn-guard rules (run with `make guard`).
 
 let s3_buckets = Resources.*[ Type == 'AWS::S3::Bucket' ]
 rule s3_private_and_encrypted when %s3_buckets !empty {

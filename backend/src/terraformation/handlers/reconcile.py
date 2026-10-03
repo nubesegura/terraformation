@@ -1,4 +1,4 @@
-"""Reconciliación semanal (red de seguridad): rellena huecos y realinea el estado vigente."""
+"""Weekly reconciliation (safety net): fills gaps and realigns the current state."""
 
 from __future__ import annotations
 

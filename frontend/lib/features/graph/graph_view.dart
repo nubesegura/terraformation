@@ -9,6 +9,7 @@ import '../../core/state_ref.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets.dart';
 import 'layout.dart';
+import '../../l10n/app_strings.dart';
 
 const int kMaxGraphNodes = 600;
 
@@ -28,7 +29,7 @@ class GraphTab extends ConsumerWidget {
   }
 }
 
-/// Grafo interactivo (zoom/pan, selección, filtros por módulo y texto).
+/// Interactive graph (zoom/pan, selection, module and text filters).
 class DependencyGraphView extends StatefulWidget {
   const DependencyGraphView({super.key, required this.graph});
   final DependencyGraph graph;
@@ -83,7 +84,7 @@ class _DependencyGraphViewState extends State<DependencyGraphView> {
   @override
   Widget build(BuildContext context) {
     if (widget.graph.nodes.isEmpty) {
-      return const Center(child: Text('Este state no tiene recursos.'));
+      return Center(child: Text(context.s.graphNoResources));
     }
     if (_layout == null || _key != '$moduleMode|$moduleFilter') _compute();
     final layout = _layout!;
@@ -104,9 +105,9 @@ class _DependencyGraphViewState extends State<DependencyGraphView> {
         padding: const EdgeInsets.only(bottom: 8),
         child: Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
           SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: false, label: Text('Recursos'), icon: Icon(Icons.hub_outlined)),
-              ButtonSegment(value: true, label: Text('Módulos'), icon: Icon(Icons.account_tree_outlined)),
+            segments: [
+              ButtonSegment(value: false, label: Text(context.s.resources), icon: const Icon(Icons.hub_outlined)),
+              ButtonSegment(value: true, label: Text(context.s.modulesTitle), icon: const Icon(Icons.account_tree_outlined)),
             ],
             selected: {moduleMode},
             onSelectionChanged: (s) => setState(() => moduleMode = s.first),
@@ -114,9 +115,9 @@ class _DependencyGraphViewState extends State<DependencyGraphView> {
           if (!moduleMode)
             DropdownButton<String?>(
               value: moduleFilter,
-              hint: const Text('Todos los módulos'),
+              hint: Text(context.s.allModules),
               items: [
-                const DropdownMenuItem(value: null, child: Text('Todos los módulos')),
+                DropdownMenuItem(value: null, child: Text(context.s.allModules)),
                 for (final m in _modules) DropdownMenuItem(value: m, child: Text(m)),
               ],
               onChanged: (v) => setState(() => moduleFilter = v),
@@ -124,14 +125,14 @@ class _DependencyGraphViewState extends State<DependencyGraphView> {
           SizedBox(
             width: 220,
             child: TextField(
-              decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search), hintText: 'Resaltar…', isDense: true, border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search), hintText: context.s.highlightHint, isDense: true, border: const OutlineInputBorder()),
               onChanged: (v) => setState(() => query = v.toLowerCase()),
             ),
           ),
-          Text('${_nodes.length} nodos · ${_edges.length} dependencias', style: Theme.of(context).textTheme.bodySmall),
+          Text(context.s.graphCounts(_nodes.length, _edges.length), style: Theme.of(context).textTheme.bodySmall),
           if (widget.graph.nodes.length > kMaxGraphNodes && !moduleMode)
-            const Tag('mostrando los primeros 600; filtra por módulo', color: Palette.modified),
+            Tag(context.s.graphTruncated(kMaxGraphNodes), color: Palette.modified),
         ]),
       ),
       Expanded(
@@ -240,10 +241,10 @@ class _NodePanel extends StatelessWidget {
             Tag(node.kind),
             if (node.type.isNotEmpty) Tag(node.type),
             Tag(node.module),
-            if (node.instances > 1) Tag('${node.instances} instancias'),
+            if (node.instances > 1) Tag(context.s.instancesTag(node.instances)),
           ]),
-          list('Depende de', dependsOn),
-          list('Usado por', usedBy),
+          list(context.s.dependsOnTitle, dependsOn),
+          list(context.s.usedByTitle, usedBy),
         ]),
       ),
     );
@@ -287,7 +288,7 @@ class _GraphPainter extends CustomPainter {
         ..color = active ? textColor.withValues(alpha: 0.85) : edgeColor.withValues(alpha: hasSel ? 0.12 : 0.35)
         ..strokeWidth = active ? 1.8 : 1;
       canvas.drawLine(a, b, paint);
-      // flecha hacia el destino (la dependencia)
+      // arrow towards the target (the dependency)
       final dir = (b - a);
       final len = dir.distance;
       if (len > 24) {

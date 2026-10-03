@@ -1,4 +1,4 @@
-"""Lambda de locks: eventos Object Created/Deleted de los .tflock."""
+"""Locks Lambda: Object Created/Deleted events of the .tflock files."""
 
 from __future__ import annotations
 

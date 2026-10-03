@@ -1,4 +1,4 @@
-"""Lambda de ingesta: eventos Object Created/Deleted de los .tfstate."""
+"""Ingestion Lambda: Object Created/Deleted events of the .tfstate files."""
 
 from __future__ import annotations
 

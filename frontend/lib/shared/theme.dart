@@ -26,7 +26,7 @@ ThemeData buildTheme(Brightness b) {
   );
 }
 
-/// Colores semánticos (también legibles en modo oscuro).
+/// Semantic colors (also readable in dark mode).
 class Palette {
   static const added = Color(0xFF2EA043);
   static const removed = Color(0xFFE5484D);

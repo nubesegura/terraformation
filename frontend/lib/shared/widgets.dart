@@ -4,8 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api/api_client.dart';
 import '../core/api/models.dart';
 import 'theme.dart';
+import '../l10n/app_strings.dart';
 
-/// Renderiza un AsyncValue con carga, error (con reintento) y datos.
+/// Renders an AsyncValue with loading, error (with retry) and data.
 class AsyncView<T> extends StatelessWidget {
   const AsyncView({super.key, required this.value, required this.builder, this.onRetry});
 
@@ -45,7 +46,7 @@ class ErrorView extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Reintentar'),
+              label: Text(context.s.retry),
             ),
           ],
         ]),
@@ -121,7 +122,7 @@ class StatCard extends StatelessWidget {
   }
 }
 
-/// Insignia de estado del lock: bloqueado / liberado / sin locking detectado.
+/// Lock status badge: locked / released / no locking detected.
 class LockBadge extends StatelessWidget {
   const LockBadge({super.key, required this.lock, this.dense = false});
   final LockInfo lock;
@@ -129,21 +130,22 @@ class LockBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
     final (IconData icon, Color color, String text) = switch (lock.status) {
       'locked' => (
           lock.alert ? Icons.warning_amber_rounded : Icons.lock,
           Palette.locked,
-          lock.alert ? 'Bloqueado (alerta)' : 'Bloqueado'
+          lock.alert ? s.lockLockedAlert : s.lockLocked
         ),
-      'released' => (Icons.lock_open, Palette.released, 'Liberado'),
-      _ => (Icons.help_outline, Palette.unknown, 'Sin locking detectado'),
+      'released' => (Icons.lock_open, Palette.released, s.lockReleased),
+      _ => (Icons.help_outline, Palette.unknown, s.lockNoneDetected),
     };
     return Tooltip(
       message: lock.noneDetected
-          ? 'Nunca se vio un .tflock: posible falta de use_lockfile'
+          ? s.lockTipNoneDetected
           : lock.isLocked
               ? '${lock.who} · ${lock.operation}'
-              : 'Último lock liberado',
+              : s.lockTipReleased,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: dense ? 8 : 10, vertical: dense ? 3 : 5),
         decoration: BoxDecoration(
@@ -181,7 +183,7 @@ class Tag extends StatelessWidget {
   }
 }
 
-/// Conteos +agregados −eliminados ~modificados.
+/// Counts: +added −removed ~modified.
 class ChangeCounts extends StatelessWidget {
   const ChangeCounts({super.key, required this.added, required this.removed, required this.modified});
   final int added;
@@ -198,7 +200,7 @@ class ChangeCounts extends StatelessWidget {
   }
 }
 
-/// Mini gráfico de barras (actividad diaria).
+/// Mini bar chart (daily activity).
 class Sparkline extends StatelessWidget {
   const Sparkline({super.key, required this.values, this.height = 28, this.width = 84});
   final List<int> values;
@@ -245,7 +247,7 @@ class _SparkPainter extends CustomPainter {
   bool shouldRepaint(_SparkPainter old) => old.values != values || old.color != color;
 }
 
-/// Contenedor centrado con ancho máximo para páginas.
+/// Centered container with a maximum width for pages.
 class PageBody extends StatelessWidget {
   const PageBody({super.key, required this.child, this.maxWidth = 1280});
   final Widget child;

@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
-/// Configuración en tiempo de ejecución (`config.json`, generado desde los outputs del stack).
+/// Runtime configuration (`config.json`, generated from the stack outputs).
 class AppConfig {
   const AppConfig({
     required this.apiBaseUrl,
@@ -28,12 +28,12 @@ class AppConfig {
     final c = client ?? http.Client();
     final res = await c.get(Uri.parse('config.json'));
     if (res.statusCode != 200) {
-      throw StateError('No se pudo cargar config.json (${res.statusCode})');
+      throw StateError('Could not load config.json (${res.statusCode})');
     }
     return AppConfig.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
   }
 }
 
 final configProvider = Provider<AppConfig>(
-  (ref) => throw UnimplementedError('configProvider debe sobrescribirse en main()'),
+  (ref) => throw UnimplementedError('configProvider must be overridden in main()'),
 );

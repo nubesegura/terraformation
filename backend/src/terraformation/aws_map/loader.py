@@ -1,4 +1,4 @@
-"""Carga del mapa Terraform -> recursos AWS. Nunca lanza: un mapa roto degrada la vista, no la rompe."""
+"""Loads the Terraform -> AWS resources map. Never raises: a broken map degrades the view."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ DEFAULT_PATH = Path(__file__).with_name("resource_map.json")
 CFN_TYPE_RE = re.compile(r"^[A-Za-z0-9]+::[A-Za-z0-9]+::[A-Za-z0-9]+$")
 DEFAULT_STALE_DAYS = 180
 
-# Estados del mapa: ok | degraded (hay entradas inválidas) | unavailable (no se pudo cargar)
+# Map states: ok | degraded (there are invalid entries) | unavailable (could not be loaded)
 STATE_OK = "ok"
 STATE_DEGRADED = "degraded"
 STATE_UNAVAILABLE = "unavailable"
@@ -65,26 +65,26 @@ def _strs(value: Any) -> tuple[str, ...] | None:
 
 
 def _parse_entry(tf_type: str, raw: Any) -> MapEntry | str:
-    """Devuelve la entrada o el motivo por el que es inválida."""
+    """Returns the entry or the reason why it is invalid."""
     if not isinstance(raw, dict):
-        return "la entrada no es un objeto"
+        return "the entry is not an object"
     role = raw.get("role")
     status = raw.get("status", "provisional")
     if status not in {"verified", "provisional"}:
-        return f"status inválido: {status!r}"
+        return f"invalid status: {status!r}"
     cfn = raw.get("cfn_type")
     if cfn is not None and not (isinstance(cfn, str) and CFN_TYPE_RE.match(cfn)):
-        return f"cfn_type inválido: {cfn!r}"
+        return f"invalid cfn_type: {cfn!r}"
     names: tuple[str, ...] = ()
     if "name" in raw:
         parsed_names = _strs(raw["name"])
         if parsed_names is None:
-            return "name debe ser una lista de atributos"
+            return "name must be a list of attributes"
         names = parsed_names
     if role == "primary":
         identity = _strs(raw.get("identity"))
         if cfn is None or identity is None:
-            return "un recurso primario requiere cfn_type e identity"
+            return "a primary resource requires cfn_type and identity"
         return MapEntry(tf_type, "primary", status, cfn, identity, names)
     if role == "child":
         p = raw.get("parent")
@@ -93,16 +93,16 @@ def _parse_entry(tf_type: str, raw: Any) -> MapEntry | str:
             or not isinstance(p.get("type"), str)
             or not isinstance(p.get("child_attr"), str)
         ):
-            return "un hijo requiere parent.type y parent.child_attr"
+            return "a child requires parent.type and parent.child_attr"
         parent_attr = _strs(p.get("parent_attr"))
         if parent_attr is None:
-            return "parent.parent_attr debe ser una lista de atributos"
+            return "parent.parent_attr must be a list of attributes"
         if p["type"] == tf_type:
-            return "un recurso no puede ser hijo de su mismo tipo"
+            return "a resource cannot be a child of its own type"
         return MapEntry(
             tf_type, "child", status, cfn, (), names, ParentRule(p["type"], p["child_attr"], parent_attr)
         )
-    return f"role inválido: {role!r}"
+    return f"invalid role: {role!r}"
 
 
 def _staleness(doc: dict[str, Any], today: date, rm: ResourceMap) -> None:
@@ -113,24 +113,24 @@ def _staleness(doc: dict[str, Any], today: date, rm: ResourceMap) -> None:
     try:
         age = (today - date.fromisoformat(str(reviewed))).days
     except ValueError:
-        rm.stale = True  # sin fecha de revisión válida se asume desactualizado
-        rm.issues.append("reviewed_at ausente o inválido: el mapa se considera desactualizado")
+        rm.stale = True  # without a valid review date it is assumed stale
+        rm.issues.append("reviewed_at missing or invalid: the map is considered stale")
         return
     rm.stale = age > rm.stale_after_days
 
 
 def load_map(path: Path | None = None, today: date | None = None) -> ResourceMap:
-    """Carga y valida el mapa. Jamás propaga excepciones."""
+    """Loads and validates the map. Never propagates exceptions."""
     today = today or datetime.now(UTC).date()
     try:
         doc = json.loads((path or DEFAULT_PATH).read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        return _unavailable(f"no se pudo leer el mapa: {type(exc).__name__}")
+        return _unavailable(f"could not read the map: {type(exc).__name__}")
     if not isinstance(doc, dict) or doc.get("schema_version") != SUPPORTED_SCHEMA_VERSION:
         return _unavailable(f"schema_version no soportada (se esperaba {SUPPORTED_SCHEMA_VERSION})")
     raw_entries = doc.get("entries")
     if not isinstance(raw_entries, dict):
-        return _unavailable("el mapa no contiene 'entries'")
+        return _unavailable("the map has no 'entries'")
 
     rm = ResourceMap(state=STATE_OK)
     for tf_type, raw in raw_entries.items():
@@ -148,5 +148,5 @@ def load_map(path: Path | None = None, today: date | None = None) -> ResourceMap
 
 @lru_cache(maxsize=1)
 def default_map() -> ResourceMap:
-    """Mapa empaquetado, cargado una vez por contenedor."""
+    """Packaged map, loaded once per container."""
     return load_map()

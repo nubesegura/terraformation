@@ -8,6 +8,7 @@ import '../../core/state_ref.dart';
 import '../../shared/format.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets.dart';
+import '../../l10n/app_strings.dart';
 
 class TimelineTab extends ConsumerStatefulWidget {
   const TimelineTab({super.key, required this.stateRef});
@@ -49,9 +50,7 @@ class _TimelineTabState extends ConsumerState<TimelineTab> {
             child: Row(children: [
               Expanded(
                 child: Text(
-                  _picked.length == 2
-                      ? 'Dos versiones seleccionadas'
-                      : 'Selecciona dos versiones para compararlas (o usa “vs anterior”).',
+                  _picked.length == 2 ? context.s.twoSelected : context.s.pickTwoVersions,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -61,14 +60,14 @@ class _TimelineTabState extends ConsumerState<TimelineTab> {
                         final sorted = [..._picked]..sort((a, b) {
                             final ia = versions.indexWhere((v) => v.versionId == a);
                             final ib = versions.indexWhere((v) => v.versionId == b);
-                            return ib.compareTo(ia); // antigua primero
+                            return ib.compareTo(ia); // oldest first
                           });
                         context.go(stateLocation(widget.stateRef,
                             sub: 'diff', extra: {'from': sorted[0], 'to': sorted[1]}));
                       }
                     : null,
                 icon: const Icon(Icons.compare_arrows),
-                label: const Text('Comparar'),
+                label: Text(context.s.compare),
               ),
             ]),
           ),
@@ -122,11 +121,12 @@ class _TimelineRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    final s = context.s;
     final (IconData icon, Color color, String title) = switch (e.type) {
-      'version' => (Icons.commit, Theme.of(context).colorScheme.primary, 'Serial ${e.serial} · Terraform ${e.terraformVersion}'),
-      'delete_marker' => (Icons.delete_outline, Palette.removed, 'State eliminado (delete marker)'),
-      'lock_acquired' => (Icons.lock, Palette.locked, 'Lock adquirido por ${e.who}'),
-      _ => (Icons.lock_open, Palette.released, 'Lock liberado${e.durationS != null ? ' (${formatDuration(e.durationS)})' : ''}'),
+      'version' => (Icons.commit, Theme.of(context).colorScheme.primary, s.timelineVersion(e.serial ?? 0, e.terraformVersion ?? '')),
+      'delete_marker' => (Icons.delete_outline, Palette.removed, s.timelineDeleteMarker),
+      'lock_acquired' => (Icons.lock, Palette.locked, s.timelineLockAcquired(e.who ?? '')),
+      _ => (Icons.lock_open, Palette.released, e.durationS != null ? s.timelineLockReleasedAfter(formatDuration(e.durationS)) : s.timelineLockReleased),
     };
     final isLock = e.type.startsWith('lock');
     return IntrinsicHeight(
@@ -155,23 +155,23 @@ class _TimelineRow extends StatelessWidget {
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(title, style: isLock ? t.bodyMedium : t.titleSmall),
-                      Text('${shortDateTime(e.timestamp)} · ${relativeTime(e.timestamp)}', style: t.bodySmall),
+                      Text('${shortDateTime(e.timestamp)} · ${relativeTime(s, e.timestamp)}', style: t.bodySmall),
                       if (isLock && e.operation != null)
                         Text(e.operation!.replaceFirst('OperationType', ''), style: t.bodySmall),
                       if (e.type == 'version') ...[
                         const SizedBox(height: 6),
                         Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
                           ChangeCounts(added: e.added ?? 0, removed: e.removed ?? 0, modified: e.modified ?? 0),
-                          Tag('${e.resourceCount ?? 0} recursos'),
+                          Tag(s.resourcesCount(e.resourceCount ?? 0)),
                           Tag(shortId(e.versionId ?? ''), icon: Icons.tag),
                         ]),
                       ],
                     ]),
                   ),
                   if (onOpen != null)
-                    TextButton(onPressed: onOpen, child: const Text('Ver')),
+                    TextButton(onPressed: onOpen, child: Text(s.view)),
                   if (onVsPrevious != null)
-                    TextButton(onPressed: onVsPrevious, child: const Text('vs anterior')),
+                    TextButton(onPressed: onVsPrevious, child: Text(s.vsPrevious)),
                 ]),
               ),
             ),

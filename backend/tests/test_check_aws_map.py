@@ -19,7 +19,7 @@ def test_packaged_map_passes_structure_check():
 def test_provider_check_catches_unknown_types_and_attributes(tmp_path):
     rmap = load_map(DEFAULT_PATH)
     errors = mod.check_provider(rmap, SCHEMA)
-    assert any("aws_iam_role: el tipo no existe" in e for e in errors)  # el esquema de prueba es mínimo
+    assert any("aws_iam_role: the type does not exist" in e for e in errors)  # the test schema is minimal
     sub = {k: v for k, v in rmap.entries.items() if k in SCHEMA}
     rmap.entries = sub
     assert mod.check_provider(rmap, SCHEMA) == []
@@ -39,14 +39,13 @@ def test_structure_check_flags_missing_parent_and_cycles():
     rmap = load_map(DEFAULT_PATH)
     del rmap.entries["aws_s3_bucket"]
     assert any(
-        "aws_s3_bucket_policy: el padre aws_s3_bucket no tiene entrada" in e
-        for e in mod.check_structure(rmap)
+        "aws_s3_bucket_policy: parent aws_s3_bucket has no entry" in e for e in mod.check_structure(rmap)
     )
 
 
 def test_proposals_only_for_exact_name_matches(capsys):
-    mod.propose(["aws_glue_job", "aws_inventado_total"], {"AWS::Glue::Job", "AWS::S3::Bucket"})
+    mod.propose(["aws_glue_job", "aws_made_up_total"], {"AWS::Glue::Job", "AWS::S3::Bucket"})
     out = capsys.readouterr().out
-    assert "AWS::Glue::Job" in out and "NO verificada" in out
-    assert "aws_inventado_total: sin candidato exacto" in out
+    assert "AWS::Glue::Job" in out and "NOT verified" in out
+    assert "aws_made_up_total: no exact candidate" in out
     assert mod.normalize_cfn("AWS::ApiGatewayV2::Api") == "apigatewayv2_api"

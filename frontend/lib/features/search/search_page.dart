@@ -8,6 +8,7 @@ import '../../core/providers.dart';
 import '../../core/state_ref.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets.dart';
+import '../../l10n/app_strings.dart';
 
 class SearchPage extends ConsumerStatefulWidget {
   const SearchPage({super.key});
@@ -27,7 +28,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   Future<void> _run() async {
     if ([_type, _name.text, _module.text, _project, _attrKey.text, _attrValue.text]
         .every((e) => e == null || e.isEmpty)) {
-      setState(() => _result = AsyncValue.error('Indica al menos un filtro', StackTrace.current));
+      setState(() => _result = AsyncValue.error(context.s.searchNeedFilter, StackTrace.current));
       return;
     }
     setState(() => _result = const AsyncValue.loading());
@@ -68,9 +69,9 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     return SingleChildScrollView(
       child: PageBody(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Búsqueda de recursos', style: Theme.of(context).textTheme.headlineMedium),
+          Text(context.s.searchTitle, style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 4),
-          Text('Sobre la versión vigente de cada state. Tipo y nombre son exactos.', style: Theme.of(context).textTheme.bodySmall),
+          Text(context.s.searchSubtitle, style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 16),
           Card(
             child: Padding(
@@ -85,30 +86,30 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                     fieldViewBuilder: (context, c, f, _) => TextField(
                       controller: c,
                       focusNode: f,
-                      decoration: const InputDecoration(labelText: 'Tipo (aws_s3_bucket)', isDense: true, border: OutlineInputBorder()),
+                      decoration: InputDecoration(labelText: context.s.typeLabel, isDense: true, border: const OutlineInputBorder()),
                       onChanged: (v) => _type = v.trim().isEmpty ? null : v.trim(),
                       onSubmitted: (_) => _run(),
                     ),
                   ),
                 ),
-                field('Nombre', _name),
-                field('Módulo', _module),
+                field(context.s.nameLabel, _name),
+                field(context.s.moduleLabel, _module),
                 SizedBox(
                   width: 210,
                   child: DropdownButtonFormField<String?>(
                     initialValue: _project,
                     isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Proyecto', isDense: true, border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: context.s.projectLabel, isDense: true, border: const OutlineInputBorder()),
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('Todos')),
+                      DropdownMenuItem(value: null, child: Text(context.s.allLabel)),
                       for (final p in facets?.projects ?? const <String>[]) DropdownMenuItem(value: p, child: Text(p)),
                     ],
                     onChanged: (v) => _project = v,
                   ),
                 ),
-                field('Atributo (clave)', _attrKey),
-                field('Atributo (valor contiene)', _attrValue),
-                FilledButton.icon(onPressed: _run, icon: const Icon(Icons.search), label: const Text('Buscar')),
+                field(context.s.attrKeyLabel, _attrKey),
+                field(context.s.attrValueLabel, _attrValue),
+                FilledButton.icon(onPressed: _run, icon: const Icon(Icons.search), label: Text(context.s.searchButton)),
               ]),
             ),
           ),
@@ -118,9 +119,9 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               value: _result!,
               onRetry: _run,
               builder: (r) => r.items.isEmpty
-                  ? const Padding(padding: EdgeInsets.all(24), child: Text('Sin resultados.'))
+                  ? Padding(padding: const EdgeInsets.all(24), child: Text(context.s.noResults))
                   : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('${r.items.length} resultados${r.cursor != null ? ' (hay más; afina los filtros)' : ''}'),
+                      Text(r.cursor != null ? context.s.resultsCountMore(r.items.length) : context.s.resultsCount(r.items.length)),
                       const SizedBox(height: 8),
                       for (final h in r.items) _HitTile(h: h),
                     ]),

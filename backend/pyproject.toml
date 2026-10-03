@@ -1,7 +1,7 @@
 [project]
 name = "terraformation"
 version = "0.1.0"
-description = "Visor serverless de Terraform states en S3 (sucesor moderno de terraboard)"
+description = "Serverless Terraform state viewer for S3 (modern successor of terraboard)"
 requires-python = ">=3.13"
 license = { text = "Apache-2.0" }
 dependencies = [

@@ -1,20 +1,20 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
-  Terraformation - visor serverless de Terraform states en S3 (sucesor moderno de terraboard).
-  Stack raíz: empaquetar con `aws cloudformation package` (ver Makefile).
+  Terraformation - serverless Terraform state viewer for S3 (modern successor of terraboard).
+  Root stack: package with `aws cloudformation package` (see Makefile).
 
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
-      - Label: { default: Origen de los states }
+      - Label: { default: States source }
         Parameters: [StateBucketName, StateBucketRegion, ManageBucketNotifications, DisableNotificationsOnDelete]
       - Label: { default: General }
         Parameters: [AppName, Environment, LogRetentionDays, LogLevel, EnableXRay]
       - Label: { default: DynamoDB }
         Parameters: [TableBillingMode, TableReadCapacity, TableWriteCapacity, IndexReadCapacity, IndexWriteCapacity, PointInTimeRecovery]
-      - Label: { default: Locks y sincronización }
+      - Label: { default: Locks and synchronization }
         Parameters: [LockAlertMinutes, ReconcileSchedule, ReconcileEnabled, IngestReservedConcurrency, MaxStateBytes, DlqRetentionSeconds, AlarmTopicArn]
-      - Label: { default: API y frontend }
+      - Label: { default: API and frontend }
         Parameters: [ThrottlingRateLimit, ThrottlingBurstLimit, ExtraWebOrigin, EnablePlansApi, EnableBedrockSummary, BedrockModelId, CognitoDeletionProtection]
 
 Parameters:
@@ -28,21 +28,21 @@ Parameters:
     AllowedValues: [dev, prod]
   StateBucketName:
     Type: String
-    Description: Bucket S3 existente (con versionado) que contiene los Terraform states. No lo administra este stack.
+    Description: Existing S3 bucket (with versioning) that holds the Terraform states. This stack does not manage it.
     AllowedPattern: "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
   StateBucketRegion:
     Type: String
-    Description: Región del bucket de states. Debe coincidir con la región del despliegue (EventBridge entrega en la región del bucket).
+    Description: Region of the states bucket. It must match the deployment region (EventBridge delivers in the bucket's region).
   ManageBucketNotifications:
     Type: String
     Default: "true"
     AllowedValues: ["true", "false"]
-    Description: "true = un custom resource habilita EventBridge en el bucket preservando su configuración. false = activación manual (scripts/enable-eventbridge.sh)."
+    Description: "true = a custom resource enables EventBridge on the bucket preserving its configuration. false = manual activation (scripts/enable-eventbridge.sh)."
   DisableNotificationsOnDelete:
     Type: String
     Default: "false"
     AllowedValues: ["true", "false"]
-    Description: Al borrar el stack, desactivar EventBridge en el bucket (por defecto se deja como está).
+    Description: When the stack is deleted, disable EventBridge on the bucket (by default it is left as is).
   LogRetentionDays:
     Type: Number
     Default: 14
@@ -74,7 +74,7 @@ Parameters:
   ReconcileSchedule:
     Type: String
     Default: rate(7 days)
-    Description: Expresión de EventBridge Scheduler (rate(...) o cron(...)).
+    Description: EventBridge Scheduler expression (rate(...) or cron(...)).
   ReconcileEnabled:
     Type: String
     Default: "true"
@@ -83,7 +83,7 @@ Parameters:
     Type: Number
     Default: 0
     MinValue: 0
-    Description: 0 = sin concurrencia reservada. 1 serializa la ingesta (requiere cuota de cuenta suficiente).
+    Description: 0 = no reserved concurrency. 1 serializes ingestion (requires enough account quota).
   MaxStateBytes:
     Type: Number
     Default: 41943040
@@ -93,13 +93,13 @@ Parameters:
   AlarmTopicArn:
     Type: String
     Default: ""
-    Description: Tópico SNS opcional para la alarma de la DLQ.
+    Description: Optional SNS topic for the DLQ alarm.
   ThrottlingRateLimit: { Type: Number, Default: 20 }
   ThrottlingBurstLimit: { Type: Number, Default: 40 }
   ExtraWebOrigin:
     Type: String
     Default: ""
-    Description: Origen extra para desarrollo local (CORS y callback de Cognito), p. ej. http://localhost:8080
+    Description: Extra origin for local development (CORS and Cognito callback), e.g. http://localhost:8080
   EnablePlansApi:
     Type: String
     Default: "false"
@@ -120,7 +120,7 @@ Rules:
   BucketRegionMatchesStack:
     Assertions:
       - Assert: !Equals [!Ref StateBucketRegion, !Ref "AWS::Region"]
-        AssertDescription: El stack debe desplegarse en la misma región que el bucket de states.
+        AssertDescription: The stack must be deployed in the same region as the states bucket.
 
 Resources:
   Storage:

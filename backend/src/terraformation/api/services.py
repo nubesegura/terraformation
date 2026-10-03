@@ -1,4 +1,4 @@
-"""Dependencias de la API: acceso a datos, caché de states parseados, utilidades."""
+"""API dependencies: data access, cache of parsed states, utilities."""
 
 from __future__ import annotations
 
@@ -32,9 +32,9 @@ def decode_cursor(cursor: str | None) -> dict[str, Any] | None:
     try:
         data = json.loads(base64.urlsafe_b64decode(cursor.encode()))
     except ValueError as exc:
-        raise HTTPException(400, "cursor inválido") from exc
+        raise HTTPException(400, "invalid cursor") from exc
     if not isinstance(data, dict):
-        raise HTTPException(400, "cursor inválido")
+        raise HTTPException(400, "invalid cursor")
     return data
 
 
@@ -49,7 +49,7 @@ def parse_ts(value: str | None) -> datetime | None:
 
 
 class Services:
-    """Agrupa configuración, DynamoDB y S3 (sustituible en pruebas)."""
+    """Bundles configuration, DynamoDB and S3 (replaceable in tests)."""
 
     def __init__(self, settings: Settings, store: Store, s3: S3Reader, bedrock: Any = None) -> None:
         self.settings = settings
@@ -105,13 +105,14 @@ class Services:
         for item in self.store.list_versions(ref):
             if item["version_id"] == version_id:
                 return plain(item)  # type: ignore[no-any-return]
-        raise HTTPException(404, f"versión no encontrada: {version_id}")
+        raise HTTPException(404, f"version not found: {version_id}")
 
     def load_state(self, item: dict[str, Any]) -> ParsedState:
-        """Descarga y parsea una versión desde S3 (LRU de 4 states por contenedor)."""
+        """Downloads and parses a version from S3 (LRU of 4 states per container)."""
         if item.get("kind") != "state" or item.get("parse_error"):
             raise HTTPException(
-                422, f"la versión no contiene un state legible: {item.get('parse_error', item.get('kind'))}"
+                422,
+                f"the version does not contain a readable state: {item.get('parse_error', item.get('kind'))}",
             )
         ck = (item["key"], item["version_id"])
         if ck in self._cache:
@@ -127,7 +128,7 @@ class Services:
         return parsed
 
     def summaries(self) -> list[dict[str, Any]]:
-        """Todos los resúmenes, más reciente primero (GSI1)."""
+        """All summaries, newest first (GSI1)."""
         items: list[dict[str, Any]] = []
         kwargs: dict[str, Any] = {
             "IndexName": "GSI1",

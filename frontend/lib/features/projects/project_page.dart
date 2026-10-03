@@ -14,6 +14,7 @@ import '../graph/graph_view.dart';
 import '../state/state_tab.dart';
 import 'locks_tab.dart';
 import 'timeline_tab.dart';
+import '../../l10n/app_strings.dart';
 
 const projectTabs = ['aws', 'overview', 'timeline', 'state', 'graph', 'locks'];
 
@@ -62,20 +63,20 @@ class _Body extends StatelessWidget {
                 if (proj.workspace != 'default') Tag(proj.workspace, icon: Icons.layers_outlined),
                 if (proj.statePath.isNotEmpty) Tag(proj.statePath, icon: Icons.account_tree_outlined),
                 LockBadge(lock: proj.lock),
-                Tag('Terraform ${proj.terraformVersion ?? '—'}', icon: Icons.terminal),
+                Tag(context.s.terraformVersion(proj.terraformVersion ?? '—'), icon: Icons.terminal),
                 Tag('serial ${proj.serial ?? '—'}'),
-                Tag('${proj.resourceCount} recursos'),
+                Tag(context.s.resourcesCount(proj.resourceCount)),
               ]),
             ),
           ]),
           const SizedBox(height: 8),
-          const TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [
-            Tab(text: 'Recursos AWS', icon: Icon(Icons.cloud_outlined)),
-            Tab(text: 'Resumen', icon: Icon(Icons.dashboard_outlined)),
-            Tab(text: 'Línea de tiempo', icon: Icon(Icons.timeline)),
-            Tab(text: 'Terraform', icon: Icon(Icons.dns_outlined)),
-            Tab(text: 'Grafo', icon: Icon(Icons.hub_outlined)),
-            Tab(text: 'Locks', icon: Icon(Icons.lock_clock)),
+          TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [
+            Tab(text: context.s.tabAws, icon: const Icon(Icons.cloud_outlined)),
+            Tab(text: context.s.tabOverview, icon: const Icon(Icons.dashboard_outlined)),
+            Tab(text: context.s.tabTimeline, icon: const Icon(Icons.timeline)),
+            Tab(text: context.s.tabTerraform, icon: const Icon(Icons.dns_outlined)),
+            Tab(text: context.s.tabGraph, icon: const Icon(Icons.hub_outlined)),
+            Tab(text: context.s.navLocks, icon: const Icon(Icons.lock_clock)),
           ]),
           Expanded(
             child: TabBarView(
@@ -108,13 +109,13 @@ class _Overview extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Column(children: [
         Wrap(spacing: 12, runSpacing: 12, children: [
-          SizedBox(width: 230, child: StatCard(label: 'Recursos', value: '${proj.resourceCount}', icon: Icons.dns_outlined)),
-          SizedBox(width: 230, child: StatCard(label: 'Versiones', value: '${proj.versionCount}', icon: Icons.history, color: Palette.of(4))),
+          SizedBox(width: 230, child: StatCard(label: context.s.resources, value: '${proj.resourceCount}', icon: Icons.dns_outlined)),
+          SizedBox(width: 230, child: StatCard(label: context.s.versions, value: '${proj.versionCount}', icon: Icons.history, color: Palette.of(4))),
           SizedBox(
             width: 230,
             child: StatCard(
-                label: 'Última modificación',
-                value: relativeTime(proj.lastModified),
+                label: context.s.lastModified,
+                value: relativeTime(context.s, proj.lastModified),
                 icon: Icons.schedule,
                 color: Palette.of(1)),
           ),
@@ -124,7 +125,7 @@ class _Overview extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Actividad 14 días'),
+                  Text(context.s.activity14),
                   const SizedBox(height: 8),
                   Sparkline(values: proj.activity, width: 190, height: 36),
                 ]),
@@ -135,9 +136,9 @@ class _Overview extends StatelessWidget {
         const SizedBox(height: 16),
         LayoutBuilder(builder: (context, c) {
           final children = [
-            SectionCard(title: 'Recursos por tipo', child: BarList(proj.byType)),
-            SectionCard(title: 'Recursos por provider', child: BarList(proj.byProvider)),
-            SectionCard(title: 'Recursos por módulo', child: BarList(proj.byModule)),
+            SectionCard(title: context.s.resourcesByType, child: BarList(proj.byType)),
+            SectionCard(title: context.s.resourcesByProvider, child: BarList(proj.byProvider)),
+            SectionCard(title: context.s.resourcesByModule, child: BarList(proj.byModule)),
           ];
           if (c.maxWidth < 900) {
             return Column(children: [for (final w in children) Padding(padding: const EdgeInsets.only(bottom: 12), child: w)]);

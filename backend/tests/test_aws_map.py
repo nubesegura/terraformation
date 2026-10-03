@@ -93,7 +93,7 @@ def test_loader_never_raises_on_missing_or_broken_file(tmp_path):
 
 def test_invalid_entries_degrade_without_losing_the_rest(tmp_path):
     doc = json.loads(json.dumps(BASE))
-    doc["entries"]["aws_broken"] = {"role": "primary", "cfn_type": "no-es-un-tipo", "identity": ["id"]}
+    doc["entries"]["aws_broken"] = {"role": "primary", "cfn_type": "not-a-type", "identity": ["id"]}
     doc["entries"]["aws_self"] = {
         "role": "child",
         "parent": {"type": "aws_self", "child_attr": "x", "parent_attr": ["id"]},
@@ -109,7 +109,7 @@ def test_staleness_is_a_warning_not_an_error(tmp_path):
     doc = {**BASE, "reviewed_at": "2025-01-01"}
     m = rmap(tmp_path, doc)
     assert m.state == STATE_OK and m.stale
-    assert rmap(tmp_path, {**BASE, "reviewed_at": "mañana"}).stale
+    assert rmap(tmp_path, {**BASE, "reviewed_at": "tomorrow"}).stale
     assert not rmap(tmp_path).stale
 
 
@@ -181,7 +181,7 @@ def test_helpers_data_and_other_providers_are_listed_not_hidden(tmp_path):
 
 # ---- resolvedor: falla segura ------------------------------------------------------------
 def test_unknown_type_is_unmapped_never_guessed_by_name(tmp_path):
-    # aws_s3_bucket_nuevo "se parece" a un bucket, pero sin regla no se adivina.
+    # aws_s3_bucket_nuevo "looks like" a bucket, but without a rule nothing is guessed.
     res = R.resolve(
         [item("aws_s3_bucket_nuevo.x", "aws_s3_bucket_nuevo", {"id": "x", "bucket": "x"})], rmap(tmp_path)
     )
@@ -239,7 +239,7 @@ def test_unavailable_map_makes_everything_unmapped(tmp_path):
     assert [u.reason for u in res.unmapped] == [R.MAP_UNAVAILABLE]
     assert [c.address for c in res.helpers] == [
         "random_id.r"
-    ]  # clasificación intrínseca, no depende del mapa
+    ]  # intrinsic classification, does not depend on the map
     assert res.coverage()["percent"] == 0.0
 
 

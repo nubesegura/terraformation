@@ -1,4 +1,4 @@
-"""Lambda de escritura de planes (POST /api/plans) detrás de API Gateway HTTP API."""
+"""Plan-writing Lambda (POST /api/plans) behind an API Gateway HTTP API."""
 
 from __future__ import annotations
 

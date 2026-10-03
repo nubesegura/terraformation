@@ -22,7 +22,7 @@ String randomString(int bytes, [Random? rng]) {
   return _b64url(List<int>.generate(bytes, (_) => r.nextInt(256)));
 }
 
-/// code_challenge = BASE64URL(SHA256(verifier)) (RFC 7636, método S256).
+/// code_challenge = BASE64URL(SHA256(verifier)) (RFC 7636, S256 method).
 String pkceChallenge(String verifier) => _b64url(sha256.convert(ascii.encode(verifier)).bytes);
 
 Map<String, dynamic> decodeJwtPayload(String jwt) {
@@ -37,18 +37,30 @@ Map<String, dynamic> decodeJwtPayload(String jwt) {
 }
 
 class AuthState {
-  const AuthState({this.authenticated = false, this.email, this.busy = true, this.error});
+  const AuthState({this.authenticated = false, this.email, this.busy = true, this.error, this.errorKind, this.errorDetail});
 
   final bool authenticated;
   final String? email;
   final bool busy;
   final String? error;
+
+  /// Stable error kind (`invalid_response`, `token_rejected`) so the UI can translate it; null for raw OAuth errors.
+  final String? errorKind;
+  final int? errorDetail;
+}
+
+class TokenRejected implements Exception {
+  const TokenRejected(this.status);
+  final int status;
+
+  @override
+  String toString() => 'Cognito rejected the token request ($status)';
 }
 
 final browserProvider = Provider<Browser>((ref) => createBrowser());
 final httpClientProvider = Provider<http.Client>((ref) => http.Client());
 
-/// Autenticación con Cognito managed login: Authorization Code + PKCE (sin secreto).
+/// Authentication with Cognito managed login: Authorization Code + PKCE (no secret).
 class AuthController extends Notifier<AuthState> {
   late final AppConfig _cfg = ref.read(configProvider);
   late final Browser _browser = ref.read(browserProvider);
@@ -57,7 +69,7 @@ class AuthController extends Notifier<AuthState> {
   @override
   AuthState build() => const AuthState();
 
-  /// Se llama una vez al arrancar: procesa `?code=` o restaura la sesión.
+  /// Called once at startup: handles `?code=` or restores the session.
   Future<void> init() async {
     final uri = _browser.currentUri;
     final code = uri.queryParameters['code'];
@@ -73,7 +85,7 @@ class AuthController extends Notifier<AuthState> {
       final verifier = _browser.getSession(_kVerifier);
       _browser.replaceUrl(uri.path);
       if (st == null || st != expected || verifier == null) {
-        state = const AuthState(busy: false, error: 'Respuesta de inicio de sesión no válida');
+        state = const AuthState(busy: false, error: 'Invalid sign-in response', errorKind: 'invalid_response');
         return;
       }
       try {
@@ -87,7 +99,9 @@ class AuthController extends Notifier<AuthState> {
         _browser.removeSession(_kVerifier);
         _browser.removeSession(_kState);
       } catch (e) {
-        state = AuthState(busy: false, error: '$e');
+        state = e is TokenRejected
+            ? AuthState(busy: false, error: '$e', errorKind: 'token_rejected', errorDetail: e.status)
+            : AuthState(busy: false, error: '$e');
       }
       return;
     }
@@ -120,7 +134,7 @@ class AuthController extends Notifier<AuthState> {
       body: body,
     );
     if (res.statusCode != 200) {
-      throw StateError('Cognito rechazó la solicitud de token (${res.statusCode})');
+      throw TokenRejected(res.statusCode);
     }
     final j = jsonDecode(res.body) as Map<String, dynamic>;
     _browser.setSession(_kAccess, j['access_token'] as String);
@@ -153,7 +167,7 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  /// Token de acceso vigente (renueva si hace falta) o `null` si no hay sesión.
+  /// Current access token (refreshed if needed) or `null` when there is no session.
   Future<String?> accessToken() async {
     if (_browser.getSession(_kAccess) == null) return null;
     if (_expired() && !await refresh()) return null;

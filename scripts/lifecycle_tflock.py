@@ -1,15 +1,15 @@
-"""Genera reglas de lifecycle para expirar versiones NO actuales de los .tflock.
+"""Generates lifecycle rules to expire NON-current versions of the .tflock files.
 
-S3 no filtra por sufijo; usamos como ``Prefix`` la key exacta de cada lock
-(``<state-key>.tflock``), que no es prefijo de ningún ``.tfstate``.
+S3 does not filter by suffix; we use the exact key of each lock as ``Prefix``
+(``<state-key>.tflock``), which is not a prefix of any ``.tfstate``.
 
-Uso (solo lectura en AWS; la aplicación la haces tú):
+Usage (read-only on AWS; you apply the result yourself):
 
     aws s3api list-objects-v2 --bucket MI_BUCKET --query 'Contents[].Key' --output text \
       | tr '\\t' '\\n' | python scripts/lifecycle_tflock.py --days 30 > rules.json
 
-IMPORTANTE: PutBucketLifecycleConfiguration reemplaza TODA la configuración; combina estas
-reglas con las que ya tengas (``aws s3api get-bucket-lifecycle-configuration``).
+IMPORTANT: PutBucketLifecycleConfiguration replaces the WHOLE configuration; merge these
+rules with the ones you already have (``aws s3api get-bucket-lifecycle-configuration``).
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def build_rules(keys: list[str], days: int) -> list[dict[str, Any]]:
         )
     if len(rules) > MAX_RULES:
         raise SystemExit(
-            f"{len(rules)} reglas exceden el límite de {MAX_RULES} por bucket"
+            f"{len(rules)} rules exceed the limit of {MAX_RULES} per bucket"
         )
     return rules
 
@@ -53,7 +53,7 @@ def main() -> None:
         "--days",
         type=int,
         default=30,
-        help="días de retención de versiones no actuales",
+        help="retention days for non-current versions",
     )
     args = ap.parse_args()
     keys = [line.strip() for line in sys.stdin if line.strip()]

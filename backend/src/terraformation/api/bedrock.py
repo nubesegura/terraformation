@@ -1,4 +1,4 @@
-"""Resumen en lenguaje natural de un diff con Amazon Bedrock (opcional, apagado por defecto)."""
+"""Natural-language summary of a diff with Amazon Bedrock (optional, off by default)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ MAX_VALUE = 80
 
 
 def diff_digest(diff: StateDiff) -> dict[str, Any]:
-    """Resumen compacto del diff: solo direcciones, claves y valores ya enmascarados/truncados."""
+    """Compact digest of the diff: only addresses, keys and already masked/truncated values."""
 
     def cut(v: str | None) -> str | None:
         return None if v is None else v[:MAX_VALUE]
@@ -38,11 +38,19 @@ def diff_digest(diff: StateDiff) -> dict[str, Any]:
     }
 
 
-def summarize_diff(client: Any, model_id: str, diff: StateDiff, language: str = "es") -> str:
+_LANGUAGE_NAMES = {"en": "English", "es": "Spanish"}
+
+
+_LANGUAGE_NAMES = {"en": "English", "es": "Spanish"}
+
+
+def summarize_diff(client: Any, model_id: str, diff: StateDiff, language: str = "en") -> str:
     prompt = (
-        f"Resume en {language} los cambios entre dos versiones de un Terraform state. "
-        "Sé conciso (máximo 8 viñetas), agrupa por riesgo e indica cambios potencialmente "
-        "destructivos. No inventes datos. Datos (JSON):\n" + json.dumps(diff_digest(diff), ensure_ascii=False)
+        f"Summarize in {_LANGUAGE_NAMES.get(language, language)} the changes between two "
+        "versions of a Terraform state. "
+        "Be concise (at most 8 bullets), group by risk and point out potentially "
+        "destructive changes. Do not invent data. Data (JSON):\n"
+        + json.dumps(diff_digest(diff), ensure_ascii=False)
     )
     resp = client.converse(
         modelId=model_id,

@@ -7,6 +7,7 @@ import '../../core/state_ref.dart';
 import '../../shared/format.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets.dart';
+import '../../l10n/app_strings.dart';
 
 class LocksTab extends ConsumerWidget {
   const LocksTab({super.key, required this.stateRef});
@@ -14,6 +15,7 @@ class LocksTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = context.s;
     final key = stateRef;
     return AsyncView<LockHistory>(
       value: ref.watch(projectLocksProvider(key)),
@@ -22,9 +24,9 @@ class LocksTab extends ConsumerWidget {
         _CurrentLock(lock: h.current),
         const SizedBox(height: 16),
         SectionCard(
-          title: 'Historial de locks (${h.items.length})',
+          title: s.lockHistory(h.items.length),
           child: h.items.isEmpty
-              ? const Text('No se registraron locks. Si usas el backend S3, revisa que `use_lockfile = true`.')
+              ? Text(s.noLocksRecorded)
               : Column(children: [for (final r in h.items) _LockRow(r: r)]),
         ),
       ]),
@@ -38,16 +40,17 @@ class _CurrentLock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    final s = context.s;
     final (String title, String body, Color color) = switch (lock.status) {
       'locked' => (
-          lock.alert ? 'Bloqueado — alerta por duración' : 'Bloqueado',
-          '${lock.who} · ${lock.operation.replaceFirst('OperationType', '')} · desde ${shortDateTime(lock.since)} (${formatDuration(lock.durationS)})',
+          lock.alert ? s.lockedAlertByDuration : s.lockLocked,
+          s.whoSinceDuration(lock.who, lock.operation.replaceFirst('OperationType', ''), shortDateTime(lock.since), formatDuration(lock.durationS)),
           Palette.locked
         ),
-      'released' => ('Liberado', 'Último lock de ${lock.who.isEmpty ? '—' : lock.who}, liberado ${relativeTime(lock.releasedAt)}', Palette.released),
+      'released' => (s.lockReleased, s.lastLockReleased(lock.who.isEmpty ? '—' : lock.who, relativeTime(s, lock.releasedAt)), Palette.released),
       _ => (
-          'Sin locking detectado',
-          'Nunca se vio un .tflock para este state. Posible falta de use_lockfile = true en el backend.',
+          s.lockNoneDetected,
+          s.noLockEverSeen,
           Palette.unknown
         ),
     };
@@ -74,14 +77,15 @@ class _LockRow extends StatelessWidget {
   final LockRecord r;
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
     return ListTile(
       dense: true,
       contentPadding: EdgeInsets.zero,
       leading: Icon(r.active ? Icons.lock : Icons.lock_open, color: r.active ? (r.alert ? Palette.locked : Palette.modified) : Palette.released),
       title: Text('${r.who} · ${r.operation.replaceFirst('OperationType', '')}'),
       subtitle: Text(
-          '${shortDateTime(r.acquiredAt)} > ${r.active ? 'activo' : shortDateTime(r.releasedAt)} · ${formatDuration(r.durationS)}${r.terraformVersion.isEmpty ? '' : ' · TF ${r.terraformVersion}'}'),
-      trailing: r.alert ? const Tag('Alerta', color: Palette.locked) : Text(shortId(r.lockId), style: const TextStyle(fontSize: 11)),
+          '${shortDateTime(r.acquiredAt)} > ${r.active ? s.activeLower : shortDateTime(r.releasedAt)} · ${formatDuration(r.durationS)}${r.terraformVersion.isEmpty ? '' : ' · ${s.terraformShort(r.terraformVersion)}'}'),
+      trailing: r.alert ? Tag(s.alertTag, color: Palette.locked) : Text(shortId(r.lockId), style: const TextStyle(fontSize: 11)),
     );
   }
 }

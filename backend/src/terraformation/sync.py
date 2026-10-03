@@ -1,4 +1,4 @@
-"""Motor de sincronización completa (backfill y reconciliación) con reanudación."""
+"""Full synchronization engine (backfill and reconciliation) with resume."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def _groups(entries: Iterator[VEntry]) -> Iterator[list[VEntry]]:
 
 
 def sync_state_key(ctx: Ctx, entries: list[VEntry], *, resync_current: bool = False) -> dict[str, int]:
-    """Registra todas las versiones de un key (antigua → reciente) sin repetir trabajo."""
+    """Registers every version of a key (oldest → newest) without repeating work."""
     ref = parse_key(entries[0].key)
     stats = {"ingested": 0, "duplicate": 0, "unparsable": 0, "markers": 0}
     if ref is None:
@@ -49,7 +49,7 @@ def sync_state_key(ctx: Ctx, entries: list[VEntry], *, resync_current: bool = Fa
             parsed_map[e.version_id] = parsed
             last = parsed
         elif status == "duplicate":
-            last = None  # no se conserva el parseo de versiones ya existentes
+            last = None  # the parse of already existing versions is not kept
     finalize_key(ctx, ref, entries, parsed_map, force=resync_current)
     return stats
 
@@ -62,10 +62,10 @@ def sync_bucket(
     resync_current: bool = False,
     on_key: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
-    """Recorre el bucket. Devuelve ``{"done": bool, "cursor": str, "stats": {...}}``."""
+    """Walks the bucket. Returns ``{"done": bool, "cursor": str, "stats": {...}}``."""
     totals = {"states": 0, "locks": 0, "ingested": 0, "duplicate": 0, "unparsable": 0, "markers": 0}
     last_key = cursor
-    processed = False  # al menos un key por tramo garantiza progreso
+    processed = False  # at least one key per slice guarantees progress
     for group in _groups(ctx.s3.list_entries(start_after_key=cursor)):
         key = group[0].key
         if cursor and key <= cursor:

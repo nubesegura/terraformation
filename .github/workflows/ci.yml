@@ -1,7 +1,7 @@
 name: CI
 
-# Un solo run por push: en `develop` y `main` el CI lo ejecuta `deploy.yml` (workflow_call) antes de
-# desplegar. Este workflow solo corre por sí mismo en los pull requests.
+# A single run per push: on `develop` and `main` the CI is run by `deploy.yml` (workflow_call) before
+# deploying. This workflow only runs on its own for pull requests.
 on:
   workflow_call:
   pull_request:

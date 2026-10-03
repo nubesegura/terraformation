@@ -6,22 +6,12 @@ import '../../core/providers.dart';
 import '../../core/state_ref.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets.dart';
+import '../../l10n/app_strings.dart';
 
-/// Motivos por los que un recurso no se pudo asociar a un recurso AWS.
-const unmappedReasons = {
-  'no_rule': 'Tipo sin regla en el mapa',
-  'non_aws_provider': 'Proveedor distinto de AWS',
-  'missing_identity': 'Sin identificador utilizable',
-  'missing_parent_ref': 'Sin referencia a su recurso padre',
-  'orphan_child': 'Su recurso padre no está en este state',
-  'ambiguous_parent': 'Coincide con más de un recurso padre',
-  'invalid_map_entry': 'Regla inválida en el mapa',
-  'map_unavailable': 'El mapa no se pudo cargar',
-};
+/// Translated reason why a resource could not be associated with an AWS resource.
+String reasonLabel(BuildContext context, String reason) => context.s.unmappedReason(reason);
 
-String reasonLabel(String reason) => unmappedReasons[reason] ?? reason;
-
-/// Vista principal: los recursos AWS que despliega el state, agrupados por tipo de CloudFormation.
+/// Main view: the AWS resources the state deploys, grouped by CloudFormation type.
 class AwsResourcesTab extends ConsumerStatefulWidget {
   const AwsResourcesTab({super.key, required this.stateRef});
   final StateRef stateRef;
@@ -44,10 +34,10 @@ class _AwsResourcesTabState extends ConsumerState<AwsResourcesTab> {
         _Summary(data: data),
         const SizedBox(height: 12),
         TextField(
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.search),
-            hintText: 'Filtrar por nombre, identificador, tipo o recurso de Terraform',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.search),
+            hintText: context.s.awsFilterHint,
+            border: const OutlineInputBorder(),
             isDense: true,
           ),
           onChanged: (v) => setState(() => filter = v.trim().toLowerCase()),
@@ -56,9 +46,9 @@ class _AwsResourcesTabState extends ConsumerState<AwsResourcesTab> {
         if (data.unmapped.isNotEmpty) _UnmappedSection(items: _filterUnmapped(data.unmapped)),
         ..._groups(data.resources),
         if (data.resources.isEmpty && data.unmapped.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(24),
-            child: Text('Este state no contiene recursos AWS gestionados.'),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(context.s.noAwsResources),
           ),
         if (data.helpers.isNotEmpty || data.data.isNotEmpty)
           _OthersSection(helpers: data.helpers, data: data.data),
@@ -69,7 +59,7 @@ class _AwsResourcesTabState extends ConsumerState<AwsResourcesTab> {
   List<UnmappedResource> _filterUnmapped(List<UnmappedResource> all) => filter.isEmpty
       ? all
       : all
-          .where((u) => '${u.address} ${u.tfType} ${reasonLabel(u.reason)}'.toLowerCase().contains(filter))
+          .where((u) => '${u.address} ${u.tfType} ${reasonLabel(context, u.reason)}'.toLowerCase().contains(filter))
           .toList();
 
   bool _matches(AwsResource r) =>
@@ -111,22 +101,21 @@ class _MapBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!status.needsAttention) return const SizedBox.shrink();
+    final s = context.s;
     final (String text, Color color, IconData icon) = status.unavailable
         ? (
-            'El mapa de recursos no se pudo cargar: ningún recurso se puede asociar a AWS y todo aparece como "Sin mapear".',
+            s.mapUnavailableBanner,
             Palette.locked,
             Icons.error_outline
           )
         : status.state == 'degraded'
             ? (
-                'Hay ${status.issues.length} regla(s) inválida(s) en el mapa; los tipos afectados aparecen como "Sin mapear".',
+                s.mapDegradedBanner(status.issues.length),
                 Palette.modified,
                 Icons.warning_amber_rounded
               )
             : (
-                'El mapa lleva más de ${status.staleAfterDays} días sin revisarse '
-                    '(última revisión: ${status.reviewedAt ?? 'desconocida'}). '
-                    'Pueden faltar tipos nuevos: revisa la sección "Sin mapear".',
+                s.mapStaleBanner(status.staleAfterDays, status.reviewedAt ?? s.unknownDate),
                 Palette.modified,
                 Icons.history_toggle_off
               );
@@ -151,17 +140,18 @@ class _Summary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = data.coverage;
+    final s = context.s;
     Widget tile(Widget child) => SizedBox(width: 230, child: child);
     return Wrap(spacing: 12, runSpacing: 12, children: [
-      tile(StatCard(label: 'Recursos AWS', value: '${c.awsResources}', icon: Icons.cloud_outlined)),
+      tile(StatCard(label: s.statAwsResources, value: '${c.awsResources}', icon: Icons.cloud_outlined)),
       tile(StatCard(
-        label: 'Elementos de Terraform mapeados',
-        value: '${c.mapped} de ${c.managedTotal}',
+        label: s.statMapped,
+        value: s.statMappedValue(c.mapped, c.managedTotal),
         icon: Icons.account_tree_outlined,
         color: Palette.of(1),
       )),
       tile(StatCard(
-        label: 'Sin mapear',
+        label: s.statUnmapped,
         value: '${c.unmapped}',
         icon: Icons.help_outline,
         color: c.unmapped == 0 ? Palette.released : Palette.modified,
@@ -184,10 +174,10 @@ class _AwsResourceTile extends StatelessWidget {
       tilePadding: const EdgeInsets.symmetric(horizontal: 16),
       title: Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
         Text(r.name, style: t.titleSmall),
-        if (r.provisional) const Tag('regla provisional'),
+        if (r.provisional) Tag(context.s.provisionalTag),
       ]),
       subtitle: SelectableText(r.identity, style: const TextStyle(fontFamily: 'monospace', fontSize: 11.5)),
-      trailing: Tag('$count elemento${count == 1 ? '' : 's'} de Terraform', icon: Icons.layers_outlined),
+      trailing: Tag(context.s.terraformElements(count), icon: Icons.layers_outlined),
       childrenPadding: const EdgeInsets.fromLTRB(32, 0, 16, 8),
       children: [
         for (final c in r.all)
@@ -224,17 +214,15 @@ class _UnmappedSection extends StatelessWidget {
           shape: const Border(),
           collapsedShape: const Border(),
           leading: Icon(Icons.help_outline, color: color),
-          title: Text('Sin mapear', style: Theme.of(context).textTheme.titleSmall),
-          subtitle: const Text(
-            'Recursos que el mapa no pudo asociar con certeza a un recurso AWS. No se adivinan por nombre.',
-          ),
+          title: Text(context.s.statUnmapped, style: Theme.of(context).textTheme.titleSmall),
+          subtitle: Text(context.s.unmappedSubtitle),
           trailing: Tag('${items.length}', color: color),
           children: [
             for (final u in items)
               ListTile(
                 dense: true,
                 title: Text(u.address, style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5)),
-                subtitle: Text('${u.tfType} · ${reasonLabel(u.reason)}${u.detail.isEmpty ? '' : ' (${u.detail})'}'),
+                subtitle: Text('${u.tfType} · ${reasonLabel(context, u.reason)}${u.detail.isEmpty ? '' : ' (${u.detail})'}'),
               ),
           ],
         ),
@@ -270,12 +258,12 @@ class _OthersSection extends StatelessWidget {
         shape: const Border(),
         collapsedShape: const Border(),
         leading: const Icon(Icons.build_outlined),
-        title: Text('Utilidades y datos de Terraform', style: Theme.of(context).textTheme.titleSmall),
-        subtitle: const Text('No crean recursos AWS: contraseñas aleatorias, esperas, data sources, etc.'),
+        title: Text(context.s.othersTitle, style: Theme.of(context).textTheme.titleSmall),
+        subtitle: Text(context.s.othersSubtitle),
         trailing: Tag('${helpers.length + data.length}'),
         children: [
-          block('Utilidades (random, time, null, tls…)', helpers),
-          block('Data sources (solo lectura)', data),
+          block(context.s.utilitiesBlock, helpers),
+          block(context.s.dataSourcesBlock, data),
         ],
       ),
     );

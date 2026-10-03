@@ -1,36 +1,38 @@
 # Gitflow
 
-| Rama | Propósito | Se crea desde | Se integra en |
+> 🇪🇸 Versión en español: [docs-es/GITFLOW.md](../docs-es/GITFLOW.md)
+
+| Branch | Purpose | Created from | Merged into |
 |---|---|---|---|
-| `main` | Producción. Cada merge es desplegable (`prod`). | — | — |
-| `develop` | Integración continua (despliega a `dev`). | `main` | `main` (PR) |
-| `feature/<tema>` | Trabajo nuevo. | `develop` | `develop` (PR) |
+| `main` | Production. Every merge is deployable (`prod`). | — | — |
+| `develop` | Continuous integration (deploys to `dev`). | `main` | `main` (PR) |
+| `feature/<topic>` | New work. | `develop` | `develop` (PR) |
 
-Reglas recomendadas (configúralas en *Settings → Branches*):
+Recommended rules (configure them in *Settings → Branches*):
 
-* `main` y `develop`: PR obligatorio, CI (`backend`, `infra`, `frontend`) requerido, sin push directo.
-* `main`: al menos 1 aprobación.
-* Commits con [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:`, `docs:`, `chore:`, `infra:`).
+* `main` and `develop`: PR required, CI (`backend`, `infra`, `frontend`) required, no direct pushes.
+* `main`: at least 1 approval.
+* Commits follow [Conventional Commits](https://www.conventionalcommits.org) (`feat:`, `fix:`, `docs:`, `chore:`, `infra:`).
 
-## Environments de GitHub
+## GitHub environments
 
-Crea los environments `dev` (rama `develop`) y `prod` (rama `main`) (*Settings → Environments*). En `prod`, activa
-**Required reviewers**. Cada environment lleva:
+Create the `dev` (branch `develop`) and `prod` (branch `main`) environments (*Settings → Environments*). On `prod`, enable
+**Required reviewers**. Each environment holds:
 
-| Tipo | Nombre | Ejemplo / descripción |
+| Type | Name | Example / description |
 |---|---|---|
-| secret | `ROLE_ARN` | Rol IAM asumible por OIDC (GitHub → AWS) con permisos de CloudFormation |
-| variable | `AWS_REGION` | Región del bucket de states (el stack debe desplegarse ahí) |
-| variable | `STATE_BUCKET` | Bucket S3 existente con los states |
-| variable | `ARTIFACT_BUCKET` | (opcional) Bucket de artefactos. Si se omite se deriva del estándar `bckt-<region>-terraformation-artifacts-<cuenta>-<env>` y se crea si no existe |
-| variable | `EXTRA_PARAMS` | Parámetros extra, p. ej. `EnablePlansApi=true` |
+| secret | `ROLE_ARN` | IAM role assumable through OIDC (GitHub → AWS) with CloudFormation permissions |
+| variable | `AWS_REGION` | Region of the states bucket (the stack must be deployed there) |
+| variable | `STATE_BUCKET` | Existing S3 bucket that holds the states |
+| variable | `ARTIFACT_BUCKET` | (optional) Artifacts bucket. If omitted it is derived from the standard `bckt-<region>-terraformation-artifacts-<account>-<env>` and created if missing |
+| variable | `EXTRA_PARAMS` | Extra parameters, e.g. `EnablePlansApi=true` |
 
-Comandos (`gh` CLI, ejecútalos tú):
+Commands (`gh` CLI, run them yourself):
 
 ```bash
 gh api -X PUT repos/<owner>/<repo>/environments/dev
 gh api -X PUT repos/<owner>/<repo>/environments/prod
-gh secret set ROLE_ARN --env dev  --body "arn:aws:iam::<cuenta>:role/<rol-github-oidc>"
+gh secret set ROLE_ARN --env dev  --body "arn:aws:iam::<account>:role/<github-oidc-role>"
 gh variable set AWS_REGION     --env dev --body "us-east-1"
-gh variable set STATE_BUCKET   --env dev --body "<bucket-de-states>"
+gh variable set STATE_BUCKET   --env dev --body "<states-bucket>"
 ```

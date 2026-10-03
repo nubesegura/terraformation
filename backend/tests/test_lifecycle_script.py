@@ -25,6 +25,6 @@ def test_rules_target_only_lock_keys():
     }
     assert all(set(r) == {"ID", "Status", "Filter", "NoncurrentVersionExpiration"} for r in rules)
     assert all(r["NoncurrentVersionExpiration"] == {"NoncurrentDays": 14} for r in rules)
-    # ninguna regla puede alcanzar un .tfstate: el prefijo termina en .tflock
+    # no rule can reach a .tfstate: the prefix ends in .tflock
     assert all(p.endswith(".tflock") for p in prefixes)
     assert not any(k.startswith(p) for k in keys for p in prefixes)

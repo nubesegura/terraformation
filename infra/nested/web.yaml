@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Terraformation - bucket S3 privado + CloudFront con Origin Access Control
+Description: Terraformation - private S3 bucket + CloudFront with Origin Access Control
 
 Parameters:
   AppName: { Type: String }
@@ -29,7 +29,7 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_18
-            comment: Bucket de assets estáticos públicos del frontend; el acceso se audita en CloudFront
+            comment: Bucket of the frontend's public static assets; access is audited in CloudFront
 
   SiteBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -113,15 +113,15 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_86
-            comment: Logs de acceso de CloudFront desactivados para evitar costo; se pueden habilitar si se requiere
+            comment: CloudFront access logs disabled to avoid cost; they can be enabled if required
           - id: CKV_AWS_174
-            comment: Se usa el certificado por defecto *.cloudfront.net (sin dominio propio)
+            comment: The default *.cloudfront.net certificate is used (no custom domain)
           - id: CKV_AWS_68
-            comment: WAF fuera de alcance por costo; el acceso a datos exige JWT de Cognito
+            comment: WAF out of scope due to cost; data access requires a Cognito JWT
           - id: CKV_AWS_310
-            comment: Un solo origen, sin failover
+            comment: Single origin, no failover
           - id: CKV2_AWS_32
-            comment: Se aplica una política de cabeceras de seguridad propia
+            comment: A custom security headers policy is applied
       guard:
         SuppressedRules:
           - CLOUDFRONT_ORIGIN_FAILOVER_ENABLED

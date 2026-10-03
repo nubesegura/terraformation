@@ -34,8 +34,8 @@ def test_event_ingests_and_promotes(aws, ctx, fixture_bytes):
     assert len(items(aws, "RES#")) == 5
     (ver,) = items(aws, "VERSION#")
     assert ver["version_id"] == vid and ver["added"] == 5 and ver["key"] == KEY
-    assert "attributes" not in ver and "body" not in ver  # nunca el state crudo
-    # sin secretos en ningún ítem
+    assert "attributes" not in ver and "body" not in ver  # never the raw state
+    # no secrets in any item
     dump = str(plain(aws["table"].scan()["Items"]))
     assert "wJalr" not in dump and "hunter2" not in dump
     lineage = aws["table"].get_item(
@@ -73,10 +73,10 @@ def test_second_version_counts_changes_and_updates_resources(aws, ctx, fixture_b
 def test_out_of_order_does_not_override_and_fixes_successor(aws, ctx, fixture_bytes):
     v8 = put(aws, fixture_bytes, "tf-1.5.7-serial8.tfstate")
     v9 = put(aws, fixture_bytes, "tf-1.5.7-serial9.tfstate")
-    # llega primero la versión nueva (T2) y después la antigua (T1)
+    # the new version (T2) arrives first and the old one (T1) afterwards
     ingest_version(ctx, REF, KEY, v9, "2026-01-02T00:00:00Z", 100)
     first = next(v for v in items(aws, "VERSION#") if v["version_id"] == v9)
-    assert first["added"] == len(ctx.load(KEY, v9).instances)  # sin predecesor
+    assert first["added"] == len(ctx.load(KEY, v9).instances)  # no predecessor
     ingest_version(ctx, REF, KEY, v8, "2026-01-01T00:00:00Z", 100)
     summ = plain(ctx.store.get_summary(REF))
     assert summ["current_version_id"] == v9 and summ["serial"] == 9  # no retrocede
@@ -113,10 +113,10 @@ def test_delete_marker_and_restore(aws, ctx, fixture_bytes):
     assert summ["deleted"] is True and not items(aws, "RES#")
     kinds = sorted(v["kind"] for v in items(aws, "VERSION#"))
     assert kinds == ["delete_marker", "state"]
-    # el evento duplicado no duplica el marker
+    # the duplicate event does not duplicate the marker
     process_state_event(ctx, ev)
     assert len(items(aws, "VERSION#")) == 2
-    # se borra permanentemente el marker → el state vuelve a estar vigente
+    # the marker is permanently deleted → the state is current again
     aws["s3"].delete_object(Bucket=BUCKET, Key=KEY, VersionId=marker)
     ev2 = s3_event("Object Deleted", KEY, marker, **{"deletion-type": "Permanently Deleted"})
     assert process_state_event(ctx, ev2) == "deleted:promoted"

@@ -1,9 +1,9 @@
-/// Identidad de un state: proyecto + workspace + ruta dentro del proyecto.
+/// Identity of a state: project + workspace + path inside the project.
 typedef StateRef = ({String project, String workspace, String path});
 
 const defaultStatePath = 'terraform.tfstate';
 
-/// Ruta de la UI hacia un state (`/projects/<p>[/sub]?workspace=&path=&...`).
+/// UI route to a state (`/projects/<p>[/sub]?workspace=&path=&...`).
 String stateLocation(StateRef r, {String sub = '', Map<String, String> extra = const {}}) {
   final q = <String, String>{
     'workspace': r.workspace,
@@ -14,7 +14,7 @@ String stateLocation(StateRef r, {String sub = '', Map<String, String> extra = c
   return '/projects/${Uri.encodeComponent(r.project)}${sub.isEmpty ? '' : '/$sub'}?$query';
 }
 
-/// Etiqueta legible: `proyecto[:workspace][/ruta]` (omite `default` y `terraform.tfstate`).
+/// Readable label: `project[:workspace][/path]` (omits `default` and `terraform.tfstate`).
 String stateLabel(StateRef r) {
   final ws = r.workspace == 'default' ? '' : ':${r.workspace}';
   final path = r.path == defaultStatePath ? '' : '/${r.path}';

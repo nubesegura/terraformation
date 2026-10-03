@@ -1,9 +1,9 @@
-"""Convención de claves S3: proyecto, workspace y ruta del state a partir del key del objeto.
+"""S3 key convention: project, workspace and state path derived from the object key.
 
-* Proyecto = primer segmento del key (cada key de la raíz del bucket es un proyecto).
-* State = cualquier ``*.tfstate`` a cualquier profundidad dentro del proyecto; su ruta relativa
-  (incluye el nombre del archivo) identifica el state dentro del proyecto.
-* Workspaces de Terraform: ``env:/<workspace>/<proyecto>/<ruta>``.
+* Project = first segment of the key (every key at the bucket root is a project).
+* State = any ``*.tfstate`` at any depth inside the project; its relative path
+  (including the file name) identifies the state within the project.
+* Terraform workspaces: ``env:/<workspace>/<project>/<path>``.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ LOCK_SUFFIX = ".tflock"
 
 @dataclass(frozen=True)
 class StateRef:
-    """Identifica un state: (proyecto, workspace, ruta dentro del proyecto)."""
+    """Identifies a state: (project, workspace, path inside the project)."""
 
     project: str
     workspace: str = DEFAULT_WORKSPACE
@@ -45,9 +45,9 @@ class StateRef:
 
 
 def parse_key(key: str) -> StateRef | None:
-    """Devuelve el StateRef si ``key`` es un archivo de state (``*.tfstate``).
+    """Returns the StateRef if ``key`` is a state file (``*.tfstate``).
 
-    Los ``.tflock`` (``<archivo>.tfstate.tflock``) no coinciden nunca con este patrón.
+    ``.tflock`` files (``<file>.tfstate.tflock``) never match this pattern.
     """
     if not key.endswith(STATE_SUFFIX):
         return None
@@ -55,10 +55,10 @@ def parse_key(key: str) -> StateRef | None:
     if any(not p for p in parts):
         return None
     if parts[0] == WORKSPACE_PREFIX:
-        if len(parts) < 4:  # env: / workspace / proyecto / archivo
+        if len(parts) < 4:  # env: / workspace / project / file
             return None
         return StateRef(parts[2], parts[1], "/".join(parts[3:]))
-    if len(parts) < 2:  # un state en la raíz del bucket no pertenece a ningún proyecto
+    if len(parts) < 2:  # a state at the bucket root does not belong to any project
         return None
     return StateRef(parts[0], DEFAULT_WORKSPACE, "/".join(parts[1:]))
 
