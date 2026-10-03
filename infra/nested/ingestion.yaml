@@ -1,0 +1,559 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Terraformation - ingesta dirigida por eventos (EventBridge), locks, backfill y reconciliación
+
+Parameters:
+  AppName: { Type: String }
+  Environment: { Type: String }
+  StateBucketName: { Type: String }
+  TableName: { Type: String }
+  TableArn: { Type: String }
+  DlqArn: { Type: String }
+  DlqUrl: { Type: String }
+  LockAlertMinutes: { Type: Number }
+  ReconcileSchedule: { Type: String }
+  ReconcileEnabled: { Type: String, AllowedValues: ["true", "false"] }
+  LogRetentionDays: { Type: Number }
+  LogLevel: { Type: String }
+  EnableXRay: { Type: String, AllowedValues: ["true", "false"] }
+  ManageBucketNotifications: { Type: String, AllowedValues: ["true", "false"] }
+  DisableNotificationsOnDelete: { Type: String, AllowedValues: ["true", "false"] }
+  IngestReservedConcurrency: { Type: Number }
+  MaxStateBytes: { Type: Number }
+
+Conditions:
+  XRayOn: !Equals [!Ref EnableXRay, "true"]
+  ManageNotifications: !Equals [!Ref ManageBucketNotifications, "true"]
+  ReserveConcurrency: !Not [!Equals [!Ref IngestReservedConcurrency, 0]]
+  ScheduleOn: !Equals [!Ref ReconcileEnabled, "true"]
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Architectures: [arm64]
+    MemorySize: 1024
+    Tracing: !If [XRayOn, Active, PassThrough]
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref TableName
+        STATE_BUCKET: !Ref StateBucketName
+        LOCK_ALERT_MINUTES: !Ref LockAlertMinutes
+        MAX_STATE_BYTES: !Ref MaxStateBytes
+        POWERTOOLS_LOG_LEVEL: !Ref LogLevel
+        POWERTOOLS_TRACE_DISABLED: !If [XRayOn, "false", "true"]
+
+Resources:
+  # ------------------------------------------------------------------ logs
+  IngestLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AppName}-${Environment}-ingest"
+      RetentionInDays: !Ref LogRetentionDays
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_158
+            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+      guard:
+        SuppressedRules:
+          - CLOUDWATCH_LOG_GROUP_ENCRYPTED
+  LockLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AppName}-${Environment}-locks"
+      RetentionInDays: !Ref LogRetentionDays
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_158
+            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+      guard:
+        SuppressedRules:
+          - CLOUDWATCH_LOG_GROUP_ENCRYPTED
+  BackfillLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AppName}-${Environment}-backfill"
+      RetentionInDays: !Ref LogRetentionDays
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_158
+            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+      guard:
+        SuppressedRules:
+          - CLOUDWATCH_LOG_GROUP_ENCRYPTED
+  ReconcileLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AppName}-${Environment}-reconcile"
+      RetentionInDays: !Ref LogRetentionDays
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_158
+            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+      guard:
+        SuppressedRules:
+          - CLOUDWATCH_LOG_GROUP_ENCRYPTED
+  NotificationsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AppName}-${Environment}-bucket-notifications"
+      RetentionInDays: !Ref LogRetentionDays
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_158
+            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+      guard:
+        SuppressedRules:
+          - CLOUDWATCH_LOG_GROUP_ENCRYPTED
+
+  # ------------------------------------------------------------------ roles (mínimo privilegio)
+  IngestRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - { Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }
+      Policies:
+        - PolicyName: ingest
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt IngestLogGroup.Arn
+              - Effect: Allow
+                Action: [s3:GetObject, s3:GetObjectVersion]
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}/*"
+              - Effect: Allow
+                Action: [s3:ListBucket, s3:ListBucketVersions]
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:DeleteItem, dynamodb:Query, dynamodb:BatchWriteItem]
+                Resource: !Ref TableArn
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !Ref DlqArn
+              - !If
+                - XRayOn
+                - { Effect: Allow, Action: [xray:PutTraceSegments, xray:PutTelemetryRecords], Resource: "*" }
+                - !Ref AWS::NoValue
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_290
+            comment: xray:Put* no admite restricción por recurso
+          - id: CKV_AWS_355
+            comment: xray:Put* requiere Resource "*" (solo si EnableXRay=true)
+
+  LockRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - { Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }
+      Policies:
+        - PolicyName: locks
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt LockLogGroup.Arn
+              - Effect: Allow
+                Action: [s3:GetObject, s3:GetObjectVersion]
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}/*"
+              - Effect: Allow
+                Action: [s3:ListBucket, s3:ListBucketVersions]
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:Query]
+                Resource: !Ref TableArn
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !Ref DlqArn
+              - !If
+                - XRayOn
+                - { Effect: Allow, Action: [xray:PutTraceSegments, xray:PutTelemetryRecords], Resource: "*" }
+                - !Ref AWS::NoValue
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_290
+            comment: xray:Put* no admite restricción por recurso
+          - id: CKV_AWS_355
+            comment: xray:Put* requiere Resource "*" (solo si EnableXRay=true)
+
+  BackfillRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - { Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }
+      Policies:
+        - PolicyName: backfill
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt BackfillLogGroup.Arn
+              - Effect: Allow
+                Action: [s3:GetObject, s3:GetObjectVersion]
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}/*"
+              - Effect: Allow
+                Action: [s3:ListBucket, s3:ListBucketVersions]
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:DeleteItem, dynamodb:Query, dynamodb:BatchWriteItem]
+                Resource: !Ref TableArn
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppName}-${Environment}-backfill"
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !Ref DlqArn
+              - !If
+                - XRayOn
+                - { Effect: Allow, Action: [xray:PutTraceSegments, xray:PutTelemetryRecords], Resource: "*" }
+                - !Ref AWS::NoValue
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_290
+            comment: xray:Put* no admite restricción por recurso
+          - id: CKV_AWS_355
+            comment: xray:Put* requiere Resource "*" (solo si EnableXRay=true)
+
+  ReconcileRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - { Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }
+      Policies:
+        - PolicyName: reconcile
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt ReconcileLogGroup.Arn
+              - Effect: Allow
+                Action: [s3:GetObject, s3:GetObjectVersion]
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}/*"
+              - Effect: Allow
+                Action: [s3:ListBucket, s3:ListBucketVersions]
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:UpdateItem, dynamodb:DeleteItem, dynamodb:Query, dynamodb:BatchWriteItem]
+                Resource: !Ref TableArn
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !Sub "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppName}-${Environment}-reconcile"
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !Ref DlqArn
+              - !If
+                - XRayOn
+                - { Effect: Allow, Action: [xray:PutTraceSegments, xray:PutTelemetryRecords], Resource: "*" }
+                - !Ref AWS::NoValue
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_290
+            comment: xray:Put* no admite restricción por recurso
+          - id: CKV_AWS_355
+            comment: xray:Put* requiere Resource "*" (solo si EnableXRay=true)
+
+  NotificationsRole:
+    Type: AWS::IAM::Role
+    Condition: ManageNotifications
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - { Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }
+      Policies:
+        - PolicyName: bucket-notifications
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt NotificationsLogGroup.Arn
+              - Effect: Allow
+                Action: [s3:GetBucketNotification, s3:PutBucketNotification]
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}"
+
+  # ------------------------------------------------------------------ funciones
+  IngestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AppName}-${Environment}-ingest"
+      Description: Ingesta idempotente de versiones de .tfstate (eventos Object Created/Deleted)
+      Handler: terraformation.handlers.state_ingest.handler
+      CodeUri: ../../backend/build/package/
+      Role: !GetAtt IngestRole.Arn
+      Timeout: 300
+      ReservedConcurrentExecutions: !If [ReserveConcurrency, !Ref IngestReservedConcurrency, !Ref AWS::NoValue]
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref IngestLogGroup
+      EventInvokeConfig:
+        MaximumRetryAttempts: 2
+        MaximumEventAgeInSeconds: 21600
+        DestinationConfig:
+          OnFailure: { Type: SQS, Destination: !Ref DlqArn }
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_116
+            comment: El DLQ se configura vía EventInvokeConfig (OnFailure) y en el target de EventBridge
+          - id: CKV_AWS_117
+            comment: La función no necesita VPC; solo accede a servicios AWS públicos
+          - id: CKV_AWS_173
+            comment: Variables de entorno sin secretos
+          - id: CKV_AWS_115
+            comment: Concurrencia reservada opcional por parámetro (cuentas nuevas no pueden reservar)
+
+  LockFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AppName}-${Environment}-locks"
+      Description: Estado e historial de locking a partir de los .tflock
+      Handler: terraformation.handlers.lock_ingest.handler
+      CodeUri: ../../backend/build/package/
+      Role: !GetAtt LockRole.Arn
+      MemorySize: 256
+      Timeout: 60
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref LockLogGroup
+      EventInvokeConfig:
+        MaximumRetryAttempts: 2
+        MaximumEventAgeInSeconds: 21600
+        DestinationConfig:
+          OnFailure: { Type: SQS, Destination: !Ref DlqArn }
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_116
+            comment: El DLQ se configura vía EventInvokeConfig (OnFailure) y en el target de EventBridge
+          - id: CKV_AWS_117
+            comment: La función no necesita VPC
+          - id: CKV_AWS_173
+            comment: Variables de entorno sin secretos
+          - id: CKV_AWS_115
+            comment: Sin concurrencia reservada para no consumir el mínimo no reservado de la cuenta
+
+  BackfillFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AppName}-${Environment}-backfill"
+      Description: Backfill inicial de versiones de .tfstate y .tflock (se auto-reinvoca)
+      Handler: terraformation.handlers.backfill.handler
+      CodeUri: ../../backend/build/package/
+      Role: !GetAtt BackfillRole.Arn
+      Timeout: 900
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref BackfillLogGroup
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
+        DestinationConfig:
+          OnFailure: { Type: SQS, Destination: !Ref DlqArn }
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_116
+            comment: DLQ vía EventInvokeConfig (OnFailure)
+          - id: CKV_AWS_117
+            comment: La función no necesita VPC
+          - id: CKV_AWS_173
+            comment: Variables de entorno sin secretos
+          - id: CKV_AWS_115
+            comment: Función de uso puntual; sin concurrencia reservada
+
+  ReconcileFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AppName}-${Environment}-reconcile"
+      Description: Reconciliación periódica (red de seguridad) contra las versiones de S3
+      Handler: terraformation.handlers.reconcile.handler
+      CodeUri: ../../backend/build/package/
+      Role: !GetAtt ReconcileRole.Arn
+      Timeout: 900
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref ReconcileLogGroup
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
+        DestinationConfig:
+          OnFailure: { Type: SQS, Destination: !Ref DlqArn }
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_116
+            comment: DLQ vía EventInvokeConfig (OnFailure)
+          - id: CKV_AWS_117
+            comment: La función no necesita VPC
+          - id: CKV_AWS_173
+            comment: Variables de entorno sin secretos
+          - id: CKV_AWS_115
+            comment: Ejecución semanal; sin concurrencia reservada
+
+  # ------------------------------------------------------------------ reglas de EventBridge
+  StateRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${AppName}-${Environment}-tfstate"
+      Description: Object Created/Deleted de los .tfstate → Lambda de ingesta
+      State: ENABLED
+      EventPattern:
+        source: [aws.s3]
+        detail-type: [Object Created, Object Deleted]
+        detail:
+          bucket: { name: [!Ref StateBucketName] }
+          object:
+            key: [{ suffix: .tfstate }]
+      Targets:
+        - Id: ingest
+          Arn: !GetAtt IngestFunction.Arn
+          RetryPolicy: { MaximumRetryAttempts: 8, MaximumEventAgeInSeconds: 21600 }
+          DeadLetterConfig: { Arn: !Ref DlqArn }
+
+  LockRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${AppName}-${Environment}-tflock"
+      Description: Object Created/Deleted de los .tflock → Lambda de locks
+      State: ENABLED
+      EventPattern:
+        source: [aws.s3]
+        detail-type: [Object Created, Object Deleted]
+        detail:
+          bucket: { name: [!Ref StateBucketName] }
+          object:
+            key: [{ suffix: .tfstate.tflock }]
+      Targets:
+        - Id: locks
+          Arn: !GetAtt LockFunction.Arn
+          RetryPolicy: { MaximumRetryAttempts: 8, MaximumEventAgeInSeconds: 21600 }
+          DeadLetterConfig: { Arn: !Ref DlqArn }
+
+  IngestInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref IngestFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StateRule.Arn
+
+  LockInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LockFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt LockRule.Arn
+
+  DlqPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref DlqUrl]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: EventBridgeRules
+            Effect: Allow
+            Principal: { Service: [events.amazonaws.com] }
+            Action: sqs:SendMessage
+            Resource: !Ref DlqArn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: [!GetAtt StateRule.Arn, !GetAtt LockRule.Arn]
+
+  # ------------------------------------------------------------------ reconciliación semanal
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: scheduler.amazonaws.com }
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals: { aws:SourceAccount: !Ref AWS::AccountId }
+      Policies:
+        - PolicyName: invoke-reconcile
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - { Effect: Allow, Action: lambda:InvokeFunction, Resource: !GetAtt ReconcileFunction.Arn }
+              - { Effect: Allow, Action: sqs:SendMessage, Resource: !Ref DlqArn }
+
+  ReconcileScheduleRule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub "${AppName}-${Environment}-reconcile"
+      Description: Reconciliación de baja frecuencia (solo red de seguridad)
+      State: !If [ScheduleOn, ENABLED, DISABLED]
+      ScheduleExpression: !Ref ReconcileSchedule
+      FlexibleTimeWindow: { Mode: "OFF" }
+      Target:
+        Arn: !GetAtt ReconcileFunction.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+        Input: "{}"
+        RetryPolicy: { MaximumRetryAttempts: 2, MaximumEventAgeInSeconds: 3600 }
+        DeadLetterConfig: { Arn: !Ref DlqArn }
+
+  # ------------------------------------------------------------------ activación de EventBridge en el bucket
+  NotificationsFunction:
+    Type: AWS::Serverless::Function
+    Condition: ManageNotifications
+    Properties:
+      FunctionName: !Sub "${AppName}-${Environment}-bucket-notifications"
+      Description: Custom resource que habilita EventBridge preservando la configuración existente del bucket
+      Handler: terraformation.handlers.bucket_notifications.handler
+      CodeUri: ../../backend/build/package/
+      Role: !GetAtt NotificationsRole.Arn
+      MemorySize: 128
+      Timeout: 60
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref NotificationsLogGroup
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_116
+            comment: Custom resource de ejecución única; los fallos se reportan a CloudFormation
+          - id: CKV_AWS_117
+            comment: Sin VPC
+          - id: CKV_AWS_173
+            comment: Sin secretos
+          - id: CKV_AWS_115
+            comment: Ejecución puntual
+
+  EnableEventBridge:
+    Type: Custom::StateBucketEventBridge
+    Condition: ManageNotifications
+    Properties:
+      ServiceToken: !GetAtt NotificationsFunction.Arn
+      ServiceTimeout: 120
+      BucketName: !Ref StateBucketName
+      DisableOnDelete: !Ref DisableNotificationsOnDelete
+
+Outputs:
+  IngestFunctionName: { Value: !Ref IngestFunction }
+  LockFunctionName: { Value: !Ref LockFunction }
+  BackfillFunctionName: { Value: !Ref BackfillFunction }
+  ReconcileFunctionName: { Value: !Ref ReconcileFunction }

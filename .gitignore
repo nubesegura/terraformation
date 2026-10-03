@@ -1,0 +1,34 @@
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+backend/build/
+.coverage
+.aws-sam/
+packaged-*.yaml
+frontend/build/
+frontend/.dart_tool/
+.dart_tool/
+node_modules/
+.DS_Store
+
+# Python
+*.egg-info/
+
+# Secretos y datos sensibles: nunca versionar
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+*.tfvars
+*.tfvars.json
+*.tfplan
+*.tfstate
+*.tfstate.*
+!backend/tests/fixtures/*.tfstate
+credentials

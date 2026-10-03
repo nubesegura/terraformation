@@ -1,0 +1,118 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Terraformation - tabla única de DynamoDB y cola SQS de dead-letter
+
+Parameters:
+  AppName: { Type: String }
+  Environment: { Type: String }
+  BillingMode: { Type: String, AllowedValues: [PROVISIONED, PAY_PER_REQUEST] }
+  TableReadCapacity: { Type: Number }
+  TableWriteCapacity: { Type: Number }
+  IndexReadCapacity: { Type: Number }
+  IndexWriteCapacity: { Type: Number }
+  PointInTimeRecovery: { Type: String, AllowedValues: ["true", "false"] }
+  DlqRetentionSeconds: { Type: Number }
+  AlarmTopicArn: { Type: String }
+
+Conditions:
+  Provisioned: !Equals [!Ref BillingMode, PROVISIONED]
+  EnablePitr: !Equals [!Ref PointInTimeRecovery, "true"]
+  HasAlarmTopic: !Not [!Equals [!Ref AlarmTopicArn, ""]]
+
+Resources:
+  Table:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "${AppName}-${Environment}"
+      BillingMode: !Ref BillingMode
+      ProvisionedThroughput: !If
+        - Provisioned
+        - ReadCapacityUnits: !Ref TableReadCapacity
+          WriteCapacityUnits: !Ref TableWriteCapacity
+        - !Ref AWS::NoValue
+      AttributeDefinitions:
+        - { AttributeName: PK, AttributeType: S }
+        - { AttributeName: SK, AttributeType: S }
+        - { AttributeName: GSI1PK, AttributeType: S }
+        - { AttributeName: GSI1SK, AttributeType: S }
+        - { AttributeName: GSI2PK, AttributeType: S }
+        - { AttributeName: GSI2SK, AttributeType: S }
+      KeySchema:
+        - { AttributeName: PK, KeyType: HASH }
+        - { AttributeName: SK, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - { AttributeName: GSI1PK, KeyType: HASH }
+            - { AttributeName: GSI1SK, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+          ProvisionedThroughput: !If
+            - Provisioned
+            - ReadCapacityUnits: !Ref IndexReadCapacity
+              WriteCapacityUnits: !Ref IndexWriteCapacity
+            - !Ref AWS::NoValue
+        - IndexName: GSI2
+          KeySchema:
+            - { AttributeName: GSI2PK, KeyType: HASH }
+            - { AttributeName: GSI2SK, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+          ProvisionedThroughput: !If
+            - Provisioned
+            - ReadCapacityUnits: !Ref IndexReadCapacity
+              WriteCapacityUnits: !Ref IndexWriteCapacity
+            - !Ref AWS::NoValue
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      # Clave administrada por AWS (aws/dynamodb): cifrado en reposo sin costo de KMS.
+      SSESpecification:
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !If [EnablePitr, true, false]
+      DeletionProtectionEnabled: !If [EnablePitr, true, false]
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_119
+            comment: Se usa la clave administrada por AWS para evitar el costo de una CMK de KMS
+          - id: CKV_AWS_28
+            comment: PITR es opcional (parámetro PointInTimeRecovery) para mantener el costo mínimo; el historial se reconstruye desde S3
+      guard:
+        SuppressedRules:
+          - DYNAMODB_TABLE_ENCRYPTED_KMS
+
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${AppName}-${Environment}-dlq"
+      MessageRetentionPeriod: !Ref DlqRetentionSeconds
+      SqsManagedSseEnabled: true
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_27
+            comment: SSE-SQS (clave administrada por AWS) evita el costo de KMS
+
+  DeadLetterQueueAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AppName}-${Environment}-dlq-not-empty"
+      AlarmDescription: Hay eventos fallidos en la DLQ de Terraformation
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - { Name: QueueName, Value: !GetAtt DeadLetterQueue.QueueName }
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: !If [HasAlarmTopic, [!Ref AlarmTopicArn], !Ref AWS::NoValue]
+
+Outputs:
+  TableName: { Value: !Ref Table }
+  TableArn: { Value: !GetAtt Table.Arn }
+  DlqArn: { Value: !GetAtt DeadLetterQueue.Arn }
+  DlqUrl: { Value: !Ref DeadLetterQueue }

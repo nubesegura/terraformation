@@ -1,0 +1,2428 @@
+components:
+  schemas:
+    ActiveLock:
+      properties:
+        alert:
+          default: false
+          description: Lock activo por más del umbral configurado
+          title: Alert
+          type: boolean
+        duration_s:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Segundos bloqueado hasta ahora
+          title: Duration S
+        lock_id:
+          default: ''
+          title: Lock Id
+          type: string
+        operation:
+          default: ''
+          title: Operation
+          type: string
+        path:
+          default: terraform.tfstate
+          title: Path
+          type: string
+        project:
+          title: Project
+          type: string
+        released_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Released At
+        since:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Inicio del lock activo (Created del .tflock)
+          title: Since
+        status:
+          description: locked | released | none_detected (nunca se vio un .tflock)
+          enum:
+          - locked
+          - released
+          - none_detected
+          title: Status
+          type: string
+        who:
+          default: ''
+          title: Who
+          type: string
+        workspace:
+          title: Workspace
+          type: string
+      required:
+      - status
+      - project
+      - workspace
+      title: ActiveLock
+      type: object
+    ActiveLocks:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ActiveLock'
+          title: Items
+          type: array
+        threshold_minutes:
+          title: Threshold Minutes
+          type: integer
+      required:
+      - threshold_minutes
+      - items
+      title: ActiveLocks
+      type: object
+    AttrChange:
+      properties:
+        key:
+          title: Key
+          type: string
+        kind:
+          enum:
+          - added
+          - removed
+          - changed
+          title: Kind
+          type: string
+        new:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: New
+        old:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Old
+      required:
+      - key
+      - kind
+      title: AttrChange
+      type: object
+    AwsComponent:
+      properties:
+        address:
+          title: Address
+          type: string
+        cfn_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Tipo de CloudFormation equivalente, si el mapa lo indica
+          title: Cfn Type
+        tf_type:
+          title: Tf Type
+          type: string
+      required:
+      - address
+      - tf_type
+      title: AwsComponent
+      type: object
+    AwsCoverage:
+      properties:
+        aws_resources:
+          title: Aws Resources
+          type: integer
+        managed_total:
+          title: Managed Total
+          type: integer
+        mapped:
+          title: Mapped
+          type: integer
+        percent:
+          title: Percent
+          type: number
+        unmapped:
+          title: Unmapped
+          type: integer
+        unmapped_by_reason:
+          additionalProperties:
+            type: integer
+          title: Unmapped By Reason
+          type: object
+      required:
+      - managed_total
+      - mapped
+      - unmapped
+      - percent
+      - aws_resources
+      - unmapped_by_reason
+      title: AwsCoverage
+      type: object
+    AwsMapCoverage:
+      properties:
+        map:
+          $ref: '#/components/schemas/AwsMapStatus'
+        resources:
+          title: Resources
+          type: integer
+        resources_unmapped:
+          title: Resources Unmapped
+          type: integer
+        states_checked:
+          title: States Checked
+          type: integer
+        states_total:
+          title: States Total
+          type: integer
+        truncated:
+          description: 'Hay más states que `max_states`: la cobertura es parcial'
+          title: Truncated
+          type: boolean
+        types:
+          items:
+            $ref: '#/components/schemas/MapTypeUsage'
+          title: Types
+          type: array
+        types_unmapped:
+          title: Types Unmapped
+          type: integer
+      required:
+      - map
+      - states_checked
+      - states_total
+      - truncated
+      - resources
+      - resources_unmapped
+      - types_unmapped
+      - types
+      title: AwsMapCoverage
+      type: object
+    AwsMapStatus:
+      properties:
+        entries:
+          title: Entries
+          type: integer
+        issues:
+          items:
+            type: string
+          title: Issues
+          type: array
+        reviewed_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reviewed At
+        stale:
+          description: El mapa lleva más de `stale_after_days` sin revisarse (solo aviso)
+          title: Stale
+          type: boolean
+        stale_after_days:
+          title: Stale After Days
+          type: integer
+        state:
+          enum:
+          - ok
+          - degraded
+          - unavailable
+          title: State
+          type: string
+      required:
+      - state
+      - stale
+      - stale_after_days
+      - entries
+      title: AwsMapStatus
+      type: object
+    AwsResourceOut:
+      properties:
+        cfn_type:
+          title: Cfn Type
+          type: string
+        components:
+          items:
+            $ref: '#/components/schemas/AwsComponent'
+          title: Components
+          type: array
+        identity:
+          title: Identity
+          type: string
+        name:
+          title: Name
+          type: string
+        primaries:
+          items:
+            $ref: '#/components/schemas/AwsComponent'
+          title: Primaries
+          type: array
+        status:
+          enum:
+          - verified
+          - provisional
+          title: Status
+          type: string
+      required:
+      - cfn_type
+      - identity
+      - name
+      - status
+      - primaries
+      - components
+      title: AwsResourceOut
+      type: object
+    AwsResources:
+      properties:
+        coverage:
+          $ref: '#/components/schemas/AwsCoverage'
+        data:
+          items:
+            $ref: '#/components/schemas/AwsComponent'
+          title: Data
+          type: array
+        helpers:
+          items:
+            $ref: '#/components/schemas/AwsComponent'
+          title: Helpers
+          type: array
+        map:
+          $ref: '#/components/schemas/AwsMapStatus'
+        resources:
+          items:
+            $ref: '#/components/schemas/AwsResourceOut'
+          title: Resources
+          type: array
+        unmapped:
+          items:
+            $ref: '#/components/schemas/UnmappedOut'
+          title: Unmapped
+          type: array
+      required:
+      - map
+      - coverage
+      - resources
+      - unmapped
+      - helpers
+      - data
+      title: AwsResources
+      type: object
+    Dashboard:
+      properties:
+        activity:
+          items:
+            $ref: '#/components/schemas/DayActivity'
+          title: Activity
+          type: array
+        by_module:
+          additionalProperties:
+            type: integer
+          title: By Module
+          type: object
+        by_project:
+          additionalProperties:
+            type: integer
+          title: By Project
+          type: object
+        by_provider:
+          additionalProperties:
+            type: integer
+          title: By Provider
+          type: object
+        by_type:
+          additionalProperties:
+            type: integer
+          title: By Type
+          type: object
+        lock_alerts:
+          title: Lock Alerts
+          type: integer
+        lock_threshold_minutes:
+          title: Lock Threshold Minutes
+          type: integer
+        locked:
+          title: Locked
+          type: integer
+        locks:
+          items:
+            $ref: '#/components/schemas/ActiveLock'
+          title: Locks
+          type: array
+        projects:
+          title: Projects
+          type: integer
+        providers_in_use:
+          items:
+            type: string
+          title: Providers In Use
+          type: array
+        recent:
+          items:
+            $ref: '#/components/schemas/ProjectOut'
+          title: Recent
+          type: array
+        resources:
+          title: Resources
+          type: integer
+        states:
+          title: States
+          type: integer
+        terraform_versions:
+          additionalProperties:
+            type: integer
+          title: Terraform Versions
+          type: object
+        versions:
+          title: Versions
+          type: integer
+      required:
+      - projects
+      - states
+      - resources
+      - versions
+      - locked
+      - lock_alerts
+      - lock_threshold_minutes
+      - by_type
+      - by_provider
+      - by_module
+      - by_project
+      - terraform_versions
+      - providers_in_use
+      - activity
+      - locks
+      - recent
+      title: Dashboard
+      type: object
+    DayActivity:
+      properties:
+        day:
+          title: Day
+          type: string
+        locks:
+          default: 0
+          title: Locks
+          type: integer
+        versions:
+          default: 0
+          title: Versions
+          type: integer
+      required:
+      - day
+      title: DayActivity
+      type: object
+    DiffCounts:
+      properties:
+        added:
+          default: 0
+          title: Added
+          type: integer
+        modified:
+          default: 0
+          title: Modified
+          type: integer
+        removed:
+          default: 0
+          title: Removed
+          type: integer
+        unchanged:
+          default: 0
+          title: Unchanged
+          type: integer
+      title: DiffCounts
+      type: object
+    DiffSummaryOut:
+      properties:
+        model_id:
+          title: Model Id
+          type: string
+        summary:
+          title: Summary
+          type: string
+      required:
+      - summary
+      - model_id
+      title: DiffSummaryOut
+      type: object
+    DiffSummaryRequest:
+      properties:
+        from_version:
+          title: From Version
+          type: string
+        language:
+          default: es
+          title: Language
+          type: string
+        path:
+          default: terraform.tfstate
+          title: Path
+          type: string
+        to_version:
+          title: To Version
+          type: string
+        workspace:
+          default: default
+          title: Workspace
+          type: string
+      required:
+      - from_version
+      - to_version
+      title: DiffSummaryRequest
+      type: object
+    Facets:
+      properties:
+        projects:
+          items:
+            type: string
+          title: Projects
+          type: array
+        providers:
+          additionalProperties:
+            type: integer
+          title: Providers
+          type: object
+        resource_types:
+          additionalProperties:
+            type: integer
+          title: Resource Types
+          type: object
+        terraform_versions:
+          additionalProperties:
+            type: integer
+          title: Terraform Versions
+          type: object
+      required:
+      - resource_types
+      - terraform_versions
+      - providers
+      - projects
+      title: Facets
+      type: object
+    Graph:
+      properties:
+        edges:
+          items:
+            $ref: '#/components/schemas/GraphEdge'
+          title: Edges
+          type: array
+        module_edges:
+          items:
+            $ref: '#/components/schemas/ModuleEdge'
+          title: Module Edges
+          type: array
+        nodes:
+          items:
+            $ref: '#/components/schemas/GraphNode'
+          title: Nodes
+          type: array
+      title: Graph
+      type: object
+    GraphEdge:
+      properties:
+        source:
+          title: Source
+          type: string
+        target:
+          title: Target
+          type: string
+      required:
+      - source
+      - target
+      title: GraphEdge
+      type: object
+    GraphNode:
+      properties:
+        id:
+          title: Id
+          type: string
+        instances:
+          default: 1
+          title: Instances
+          type: integer
+        kind:
+          enum:
+          - resource
+          - data
+          - module
+          title: Kind
+          type: string
+        module:
+          default: root
+          title: Module
+          type: string
+        name:
+          default: ''
+          title: Name
+          type: string
+        provider:
+          default: ''
+          title: Provider
+          type: string
+        type:
+          default: ''
+          title: Type
+          type: string
+      required:
+      - id
+      - kind
+      title: GraphNode
+      type: object
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          title: Detail
+          type: array
+      title: HTTPValidationError
+      type: object
+    Instance:
+      additionalProperties: false
+      description: Una instancia de recurso (``count``/``for_each`` generan varias).
+      properties:
+        address:
+          title: Address
+          type: string
+        attributes:
+          additionalProperties:
+            type: string
+          title: Attributes
+          type: object
+        base_address:
+          title: Base Address
+          type: string
+        dependencies:
+          items:
+            type: string
+          title: Dependencies
+          type: array
+        deposed:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Deposed
+        index:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Index
+        mode:
+          default: managed
+          enum:
+          - managed
+          - data
+          title: Mode
+          type: string
+        module:
+          default: root
+          title: Module
+          type: string
+        name:
+          title: Name
+          type: string
+        provider:
+          default: ''
+          title: Provider
+          type: string
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+        type:
+          title: Type
+          type: string
+      required:
+      - address
+      - base_address
+      - type
+      - name
+      title: Instance
+      type: object
+    LockHistory:
+      properties:
+        current:
+          $ref: '#/components/schemas/LockOut'
+        items:
+          items:
+            $ref: '#/components/schemas/LockRecord'
+          title: Items
+          type: array
+      required:
+      - current
+      - items
+      title: LockHistory
+      type: object
+    LockOut:
+      properties:
+        alert:
+          default: false
+          description: Lock activo por más del umbral configurado
+          title: Alert
+          type: boolean
+        duration_s:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          description: Segundos bloqueado hasta ahora
+          title: Duration S
+        lock_id:
+          default: ''
+          title: Lock Id
+          type: string
+        operation:
+          default: ''
+          title: Operation
+          type: string
+        released_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Released At
+        since:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Inicio del lock activo (Created del .tflock)
+          title: Since
+        status:
+          description: locked | released | none_detected (nunca se vio un .tflock)
+          enum:
+          - locked
+          - released
+          - none_detected
+          title: Status
+          type: string
+        who:
+          default: ''
+          title: Who
+          type: string
+      required:
+      - status
+      title: LockOut
+      type: object
+    LockRecord:
+      properties:
+        acquired_at:
+          title: Acquired At
+          type: string
+        active:
+          default: false
+          title: Active
+          type: boolean
+        alert:
+          default: false
+          title: Alert
+          type: boolean
+        duration_s:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Duration S
+        lock_id:
+          title: Lock Id
+          type: string
+        operation:
+          title: Operation
+          type: string
+        released_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Released At
+        terraform_version:
+          default: ''
+          title: Terraform Version
+          type: string
+        who:
+          title: Who
+          type: string
+      required:
+      - lock_id
+      - who
+      - operation
+      - acquired_at
+      title: LockRecord
+      type: object
+    MapTypeUsage:
+      properties:
+        cfn_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cfn Type
+        count:
+          description: Instancias de este tipo en todos los states revisados
+          title: Count
+          type: integer
+        mapped:
+          title: Mapped
+          type: boolean
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Motivo de 'sin mapear' más frecuente (si no está mapeado)
+          title: Reason
+        states:
+          description: States distintos donde aparece
+          title: States
+          type: integer
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+        tf_type:
+          title: Tf Type
+          type: string
+      required:
+      - tf_type
+      - count
+      - states
+      - mapped
+      title: MapTypeUsage
+      type: object
+    ModuleEdge:
+      properties:
+        count:
+          title: Count
+          type: integer
+        source:
+          title: Source
+          type: string
+        target:
+          title: Target
+          type: string
+      required:
+      - source
+      - target
+      - count
+      title: ModuleEdge
+      type: object
+    ModuleOut:
+      properties:
+        path:
+          title: Path
+          type: string
+        resource_count:
+          title: Resource Count
+          type: integer
+      required:
+      - path
+      - resource_count
+      title: ModuleOut
+      type: object
+    Output:
+      properties:
+        name:
+          title: Name
+          type: string
+        sensitive:
+          default: false
+          title: Sensitive
+          type: boolean
+        type:
+          default: ''
+          title: Type
+          type: string
+        value:
+          default: ''
+          title: Value
+          type: string
+      required:
+      - name
+      title: Output
+      type: object
+    OutputChange:
+      properties:
+        kind:
+          enum:
+          - added
+          - removed
+          - changed
+          title: Kind
+          type: string
+        name:
+          title: Name
+          type: string
+        new:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: New
+        old:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Old
+      required:
+      - name
+      - kind
+      title: OutputChange
+      type: object
+    PlanDetail:
+      properties:
+        ci_url:
+          default: ''
+          title: Ci Url
+          type: string
+        counts:
+          additionalProperties:
+            type: integer
+          title: Counts
+          type: object
+        created_at:
+          title: Created At
+          type: string
+        exit_code:
+          default: 0
+          description: 2 si el plan contiene cambios, 0 si no
+          title: Exit Code
+          type: integer
+        git_commit:
+          default: ''
+          title: Git Commit
+          type: string
+        git_remote:
+          default: ''
+          title: Git Remote
+          type: string
+        id:
+          title: Id
+          type: string
+        lineage:
+          title: Lineage
+          type: string
+        outputs:
+          items:
+            $ref: '#/components/schemas/PlanResource'
+          title: Outputs
+          type: array
+        provider_constraints:
+          additionalProperties:
+            type: string
+          title: Provider Constraints
+          type: object
+        resources:
+          items:
+            $ref: '#/components/schemas/PlanResource'
+          title: Resources
+          type: array
+        source:
+          default: ''
+          title: Source
+          type: string
+        terraform_version:
+          default: ''
+          title: Terraform Version
+          type: string
+        truncated:
+          default: false
+          title: Truncated
+          type: boolean
+      required:
+      - id
+      - lineage
+      - created_at
+      title: PlanDetail
+      type: object
+    PlanList:
+      properties:
+        cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Cursor opaco para la página siguiente
+          title: Cursor
+        items:
+          items:
+            $ref: '#/components/schemas/PlanSummary'
+          title: Items
+          type: array
+      required:
+      - items
+      title: PlanList
+      type: object
+    PlanPayload:
+      description: Mismo payload que Terraboard (POST /api/plans).
+      properties:
+        ci_url:
+          default: ''
+          title: Ci Url
+          type: string
+        git_commit:
+          default: ''
+          title: Git Commit
+          type: string
+        git_remote:
+          default: ''
+          title: Git Remote
+          type: string
+        lineage:
+          title: Lineage
+          type: string
+        plan_json:
+          additionalProperties: true
+          title: Plan Json
+          type: object
+        source:
+          default: ''
+          title: Source
+          type: string
+        terraform_version:
+          default: ''
+          title: Terraform Version
+          type: string
+      required:
+      - lineage
+      title: PlanPayload
+      type: object
+    PlanResource:
+      properties:
+        actions:
+          items:
+            type: string
+          title: Actions
+          type: array
+        address:
+          title: Address
+          type: string
+        type:
+          default: ''
+          title: Type
+          type: string
+      required:
+      - address
+      - actions
+      title: PlanResource
+      type: object
+    PlanSummary:
+      properties:
+        ci_url:
+          default: ''
+          title: Ci Url
+          type: string
+        counts:
+          additionalProperties:
+            type: integer
+          title: Counts
+          type: object
+        created_at:
+          title: Created At
+          type: string
+        exit_code:
+          default: 0
+          description: 2 si el plan contiene cambios, 0 si no
+          title: Exit Code
+          type: integer
+        git_commit:
+          default: ''
+          title: Git Commit
+          type: string
+        git_remote:
+          default: ''
+          title: Git Remote
+          type: string
+        id:
+          title: Id
+          type: string
+        lineage:
+          title: Lineage
+          type: string
+        source:
+          default: ''
+          title: Source
+          type: string
+        terraform_version:
+          default: ''
+          title: Terraform Version
+          type: string
+      required:
+      - id
+      - lineage
+      - created_at
+      title: PlanSummary
+      type: object
+    ProjectList:
+      properties:
+        cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Cursor opaco para la página siguiente
+          title: Cursor
+        items:
+          items:
+            $ref: '#/components/schemas/ProjectOut'
+          title: Items
+          type: array
+      required:
+      - items
+      title: ProjectList
+      type: object
+    ProjectOut:
+      properties:
+        activity:
+          description: Versiones por día, últimos 14 días
+          items:
+            type: integer
+          title: Activity
+          type: array
+        by_module:
+          additionalProperties:
+            type: integer
+          title: By Module
+          type: object
+        by_provider:
+          additionalProperties:
+            type: integer
+          title: By Provider
+          type: object
+        by_type:
+          additionalProperties:
+            type: integer
+          title: By Type
+          type: object
+        current_version_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Current Version Id
+        deleted:
+          default: false
+          title: Deleted
+          type: boolean
+        last_modified:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Modified
+        lineage:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Lineage
+        lock:
+          $ref: '#/components/schemas/LockOut'
+        path:
+          default: terraform.tfstate
+          title: Path
+          type: string
+        project:
+          title: Project
+          type: string
+        resource_count:
+          default: 0
+          title: Resource Count
+          type: integer
+        serial:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Serial
+        terraform_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Terraform Version
+        version_count:
+          default: 0
+          title: Version Count
+          type: integer
+        workspace:
+          title: Workspace
+          type: string
+      required:
+      - project
+      - workspace
+      - lock
+      title: ProjectOut
+      type: object
+    ResourceChange:
+      properties:
+        address:
+          title: Address
+          type: string
+        attributes:
+          additionalProperties:
+            type: string
+          title: Attributes
+          type: object
+        module:
+          title: Module
+          type: string
+        name:
+          title: Name
+          type: string
+        type:
+          title: Type
+          type: string
+      required:
+      - address
+      - type
+      - name
+      - module
+      title: ResourceChange
+      type: object
+    ResourceModified:
+      properties:
+        address:
+          title: Address
+          type: string
+        attributes:
+          additionalProperties:
+            type: string
+          title: Attributes
+          type: object
+        changes:
+          items:
+            $ref: '#/components/schemas/AttrChange'
+          title: Changes
+          type: array
+        dependencies_changed:
+          default: false
+          title: Dependencies Changed
+          type: boolean
+        module:
+          title: Module
+          type: string
+        name:
+          title: Name
+          type: string
+        sensitive_changed:
+          default: false
+          title: Sensitive Changed
+          type: boolean
+        type:
+          title: Type
+          type: string
+        unified_diff:
+          default: ''
+          title: Unified Diff
+          type: string
+      required:
+      - address
+      - type
+      - name
+      - module
+      title: ResourceModified
+      type: object
+    SearchHit:
+      properties:
+        address:
+          title: Address
+          type: string
+        attributes:
+          additionalProperties:
+            type: string
+          title: Attributes
+          type: object
+        index:
+          default: ''
+          title: Index
+          type: string
+        mode:
+          title: Mode
+          type: string
+        module:
+          title: Module
+          type: string
+        name:
+          title: Name
+          type: string
+        path:
+          default: terraform.tfstate
+          title: Path
+          type: string
+        project:
+          title: Project
+          type: string
+        provider:
+          title: Provider
+          type: string
+        type:
+          title: Type
+          type: string
+        workspace:
+          title: Workspace
+          type: string
+      required:
+      - project
+      - workspace
+      - address
+      - type
+      - name
+      - module
+      - provider
+      - mode
+      title: SearchHit
+      type: object
+    SearchResult:
+      properties:
+        cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Cursor opaco para la página siguiente
+          title: Cursor
+        items:
+          items:
+            $ref: '#/components/schemas/SearchHit'
+          title: Items
+          type: array
+      required:
+      - items
+      title: SearchResult
+      type: object
+    StateDetail:
+      properties:
+        info:
+          $ref: '#/components/schemas/StateInfoOut'
+        modules:
+          items:
+            $ref: '#/components/schemas/ModuleOut'
+          title: Modules
+          type: array
+        outputs:
+          items:
+            $ref: '#/components/schemas/Output'
+          title: Outputs
+          type: array
+        resources:
+          items:
+            $ref: '#/components/schemas/Instance'
+          title: Resources
+          type: array
+      required:
+      - info
+      - outputs
+      - modules
+      - resources
+      title: StateDetail
+      type: object
+    StateDiff:
+      properties:
+        added:
+          items:
+            $ref: '#/components/schemas/ResourceChange'
+          title: Added
+          type: array
+        from:
+          $ref: '#/components/schemas/StateInfo'
+        modified:
+          items:
+            $ref: '#/components/schemas/ResourceModified'
+          title: Modified
+          type: array
+        outputs:
+          items:
+            $ref: '#/components/schemas/OutputChange'
+          title: Outputs
+          type: array
+        removed:
+          items:
+            $ref: '#/components/schemas/ResourceChange'
+          title: Removed
+          type: array
+        summary:
+          $ref: '#/components/schemas/DiffCounts'
+        to:
+          $ref: '#/components/schemas/StateInfo'
+      required:
+      - from
+      - to
+      - summary
+      title: StateDiff
+      type: object
+    StateInfo:
+      properties:
+        last_modified:
+          default: ''
+          title: Last Modified
+          type: string
+        resource_count:
+          default: 0
+          title: Resource Count
+          type: integer
+        serial:
+          default: 0
+          title: Serial
+          type: integer
+        terraform_version:
+          default: ''
+          title: Terraform Version
+          type: string
+        version_id:
+          default: ''
+          title: Version Id
+          type: string
+      title: StateInfo
+      type: object
+    StateInfoOut:
+      properties:
+        last_modified:
+          title: Last Modified
+          type: string
+        lineage:
+          title: Lineage
+          type: string
+        path:
+          default: terraform.tfstate
+          title: Path
+          type: string
+        project:
+          title: Project
+          type: string
+        resource_count:
+          title: Resource Count
+          type: integer
+        s3_bucket:
+          title: S3 Bucket
+          type: string
+        s3_key:
+          title: S3 Key
+          type: string
+        serial:
+          title: Serial
+          type: integer
+        terraform_version:
+          title: Terraform Version
+          type: string
+        version_id:
+          title: Version Id
+          type: string
+        workspace:
+          title: Workspace
+          type: string
+      required:
+      - project
+      - workspace
+      - version_id
+      - last_modified
+      - terraform_version
+      - serial
+      - lineage
+      - resource_count
+      - s3_bucket
+      - s3_key
+      title: StateInfoOut
+      type: object
+    Timeline:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/TimelineEvent'
+          title: Items
+          type: array
+      required:
+      - items
+      title: Timeline
+      type: object
+    TimelineEvent:
+      properties:
+        added:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Added
+        duration_s:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Duration S
+        lock_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Lock Id
+        modified:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Modified
+        operation:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Operation
+        removed:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Removed
+        resource_count:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Resource Count
+        serial:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Serial
+        terraform_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Terraform Version
+        timestamp:
+          title: Timestamp
+          type: string
+        type:
+          enum:
+          - version
+          - delete_marker
+          - lock_acquired
+          - lock_released
+          title: Type
+          type: string
+        version_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Version Id
+        who:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Who
+      required:
+      - type
+      - timestamp
+      title: TimelineEvent
+      type: object
+    UnmappedOut:
+      properties:
+        address:
+          title: Address
+          type: string
+        detail:
+          default: ''
+          title: Detail
+          type: string
+        module:
+          default: root
+          title: Module
+          type: string
+        reason:
+          description: no_rule | non_aws_provider | missing_identity | missing_parent_ref | orphan_child
+            | ambiguous_parent | invalid_map_entry | map_unavailable
+          title: Reason
+          type: string
+        tf_type:
+          title: Tf Type
+          type: string
+      required:
+      - address
+      - tf_type
+      - reason
+      title: UnmappedOut
+      type: object
+    ValidationError:
+      properties:
+        ctx:
+          title: Context
+          type: object
+        input:
+          title: Input
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          title: Location
+          type: array
+        msg:
+          title: Message
+          type: string
+        type:
+          title: Error Type
+          type: string
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+      type: object
+    VersionList:
+      properties:
+        cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Cursor opaco para la página siguiente
+          title: Cursor
+        items:
+          items:
+            $ref: '#/components/schemas/VersionOut'
+          title: Items
+          type: array
+      required:
+      - items
+      title: VersionList
+      type: object
+    VersionOut:
+      properties:
+        added:
+          default: 0
+          title: Added
+          type: integer
+        is_current:
+          default: false
+          title: Is Current
+          type: boolean
+        kind:
+          default: state
+          enum:
+          - state
+          - delete_marker
+          title: Kind
+          type: string
+        last_modified:
+          title: Last Modified
+          type: string
+        lineage:
+          default: ''
+          title: Lineage
+          type: string
+        modified:
+          default: 0
+          title: Modified
+          type: integer
+        parse_error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Parse Error
+        removed:
+          default: 0
+          title: Removed
+          type: integer
+        resource_count:
+          default: 0
+          title: Resource Count
+          type: integer
+        serial:
+          default: 0
+          title: Serial
+          type: integer
+        size:
+          default: 0
+          title: Size
+          type: integer
+        terraform_version:
+          default: ''
+          title: Terraform Version
+          type: string
+        version_id:
+          title: Version Id
+          type: string
+      required:
+      - version_id
+      - last_modified
+      title: VersionOut
+      type: object
+info:
+  description: API de solo lectura para visualizar Terraform states almacenados en S3.
+  title: Terraformation API
+  version: 0.1.0
+openapi: 3.1.0
+paths:
+  /api/aws-map/coverage:
+    get:
+      description: Revisa los states vigentes de todos los proyectos y lista los tipos sin mapear.
+      operationId: aws_map_coverage_api_aws_map_coverage_get
+      parameters:
+      - in: query
+        name: max_states
+        required: false
+        schema:
+          default: 300
+          maximum: 1000
+          minimum: 1
+          title: Max States
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AwsMapCoverage'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Tipos del bucket que el mapa aún no cubre
+      tags:
+      - aws-map
+  /api/dashboard:
+    get:
+      operationId: dashboard_api_dashboard_get
+      parameters:
+      - in: query
+        name: days
+        required: false
+        schema:
+          default: 30
+          maximum: 90
+          minimum: 1
+          title: Days
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Métricas agregadas
+      tags:
+      - dashboard
+  /api/facets:
+    get:
+      operationId: facets_api_facets_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Facets'
+          description: Successful Response
+      summary: Valores para filtros de búsqueda
+      tags:
+      - search
+  /api/locks:
+    get:
+      operationId: active_locks_api_locks_get
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveLocks'
+          description: Successful Response
+      summary: Proyectos bloqueados ahora
+      tags:
+      - locks
+  /api/plans:
+    get:
+      operationId: list_plans_api_plans_get
+      parameters:
+      - in: query
+        name: lineage
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Lineage
+      - in: query
+        name: project
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Project
+      - in: query
+        name: workspace
+        required: false
+        schema:
+          default: default
+          title: Workspace
+          type: string
+      - in: query
+        name: path
+        required: false
+        schema:
+          default: terraform.tfstate
+          title: Path
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          default: 50
+          maximum: 500
+          minimum: 1
+          title: Limit
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanList'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Planes de un lineage o proyecto
+      tags:
+      - plans
+    post:
+      description: Mismo payload que terraboard. Se guarda un resumen de cambios, no el JSON crudo.
+      operationId: submit_plan_api_plans_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanPayload'
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanSummary'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Enviar un plan
+      tags:
+      - plans
+  /api/plans/{lineage}/{plan_id}:
+    get:
+      operationId: get_plan_api_plans__lineage___plan_id__get
+      parameters:
+      - in: path
+        name: lineage
+        required: true
+        schema:
+          title: Lineage
+          type: string
+      - in: path
+        name: plan_id
+        required: true
+        schema:
+          title: Plan Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanDetail'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Detalle de un plan
+      tags:
+      - plans
+  /api/projects:
+    get:
+      description: Proyectos (state = proyecto + workspace) ordenados por última modificación.
+      operationId: list_projects_api_projects_get
+      parameters:
+      - in: query
+        name: q
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Q
+      - in: query
+        name: limit
+        required: false
+        schema:
+          default: 200
+          maximum: 500
+          minimum: 1
+          title: Limit
+          type: integer
+      - in: query
+        name: activity
+        required: false
+        schema:
+          default: true
+          title: Activity
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectList'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Overview de proyectos
+      tags:
+      - projects
+  /api/projects/{project}:
+    get:
+      operationId: get_project_api_projects__project__get
+      parameters:
+      - in: path
+        name: project
+        required: true
+        schema:
+          title: Project
+          type: string
+      - description: Workspace de Terraform
+        in: query
+        name: workspace
+        required: false
+        schema:
+          default: default
+          description: Workspace de Terraform
+          title: Workspace
+          type: string
+      - description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+        in: query
+        name: path
+        required: false
+        schema:
+          default: terraform.tfstate
+          description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+          title: Path
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectOut'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Detalle de proyecto
+      tags:
+      - projects
+  /api/projects/{project}/aws-resources:
+    get:
+      description: Agrupa los recursos de Terraform en recursos AWS; lo que el mapa no reconoce va en
+        `unmapped`.
+      operationId: aws_resources_api_projects__project__aws_resources_get
+      parameters:
+      - in: path
+        name: project
+        required: true
+        schema:
+          title: Project
+          type: string
+      - description: Workspace de Terraform
+        in: query
+        name: workspace
+        required: false
+        schema:
+          default: default
+          description: Workspace de Terraform
+          title: Workspace
+          type: string
+      - description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+        in: query
+        name: path
+        required: false
+        schema:
+          default: terraform.tfstate
+          description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+          title: Path
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AwsResources'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Recursos AWS de un state (mapa Terraform → AWS)
+      tags:
+      - aws-map
+  /api/projects/{project}/diff:
+    get:
+      operationId: diff_api_projects__project__diff_get
+      parameters:
+      - in: path
+        name: project
+        required: true
+        schema:
+          title: Project
+          type: string
+      - description: versionId origen
+        in: query
+        name: from_version
+        required: true
+        schema:
+          description: versionId origen
+          title: From Version
+          type: string
+      - description: versionId destino (o `current`)
+        in: query
+        name: to_version
+        required: false
+        schema:
+          default: current
+          description: versionId destino (o `current`)
+          title: To Version
+          type: string
+      - description: Workspace de Terraform
+        in: query
+        name: workspace
+        required: false
+        schema:
+          default: default
+          description: Workspace de Terraform
+          title: Workspace
+          type: string
+      - description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+        in: query
+        name: path
+        required: false
+        schema:
+          default: terraform.tfstate
+          description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+          title: Path
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StateDiff'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Diff entre dos versiones
+      tags:
+      - states
+  /api/projects/{project}/diff/summary:
+    post:
+      operationId: diff_summary_api_projects__project__diff_summary_post
+      parameters:
+      - in: path
+        name: project
+        required: true
+        schema:
+          title: Project
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiffSummaryRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiffSummaryOut'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Resumen en lenguaje natural (Bedrock, opcional)
+      tags:
+      - states
+  /api/projects/{project}/graph:
+    get:
+      operationId: graph_api_projects__project__graph_get
+      parameters:
+      - in: path
+        name: project
+        required: true
+        schema:
+          title: Project
+          type: string
+      - description: Workspace de Terraform
+        in: query
+        name: workspace
+        required: false
+        schema:
+          default: default
+          description: Workspace de Terraform
+          title: Workspace
+          type: string
+      - description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+        in: query
+        name: path
+        required: false
+        schema:
+          default: terraform.tfstate
+          description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+          title: Path
+          type: string
+      - in: query
+        name: version
+        required: false
+        schema:
+          default: current
+          title: Version
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Graph'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Grafo de dependencias
+      tags:
+      - states
+  /api/projects/{project}/locks:
+    get:
+      operationId: project_locks_api_projects__project__locks_get
+      parameters:
+      - in: path
+        name: project
+        required: true
+        schema:
+          title: Project
+          type: string
+      - description: Workspace de Terraform
+        in: query
+        name: workspace
+        required: false
+        schema:
+          default: default
+          description: Workspace de Terraform
+          title: Workspace
+          type: string
+      - description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+        in: query
+        name: path
+        required: false
+        schema:
+          default: terraform.tfstate
+          description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+          title: Path
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          default: 100
+          maximum: 500
+          minimum: 1
+          title: Limit
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LockHistory'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Historial de locks
+      tags:
+      - locks
+  /api/projects/{project}/timeline:
+    get:
+      description: Versiones con conteo de cambios y marcas de lock/unlock, más reciente primero.
+      operationId: timeline_api_projects__project__timeline_get
+      parameters:
+      - in: path
+        name: project
+        required: true
+        schema:
+          title: Project
+          type: string
+      - description: Workspace de Terraform
+        in: query
+        name: workspace
+        required: false
+        schema:
+          default: default
+          description: Workspace de Terraform
+          title: Workspace
+          type: string
+      - description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+        in: query
+        name: path
+        required: false
+        schema:
+          default: terraform.tfstate
+          description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+          title: Path
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          default: 200
+          maximum: 500
+          minimum: 1
+          title: Limit
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timeline'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Línea de tiempo
+      tags:
+      - projects
+  /api/projects/{project}/versions:
+    get:
+      operationId: list_versions_api_projects__project__versions_get
+      parameters:
+      - in: path
+        name: project
+        required: true
+        schema:
+          title: Project
+          type: string
+      - description: Workspace de Terraform
+        in: query
+        name: workspace
+        required: false
+        schema:
+          default: default
+          description: Workspace de Terraform
+          title: Workspace
+          type: string
+      - description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+        in: query
+        name: path
+        required: false
+        schema:
+          default: terraform.tfstate
+          description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+          title: Path
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          default: 100
+          maximum: 500
+          minimum: 1
+          title: Limit
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionList'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Versiones de un state
+      tags:
+      - projects
+  /api/projects/{project}/versions/{version_id}:
+    get:
+      description: Se lee de S3 por ``versionId`` y se enmascara en memoria. ``current`` = versión vigente.
+      operationId: get_state_api_projects__project__versions__version_id__get
+      parameters:
+      - in: path
+        name: project
+        required: true
+        schema:
+          title: Project
+          type: string
+      - in: path
+        name: version_id
+        required: true
+        schema:
+          title: Version Id
+          type: string
+      - description: Workspace de Terraform
+        in: query
+        name: workspace
+        required: false
+        schema:
+          default: default
+          description: Workspace de Terraform
+          title: Workspace
+          type: string
+      - description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+        in: query
+        name: path
+        required: false
+        schema:
+          default: terraform.tfstate
+          description: Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)
+          title: Path
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StateDetail'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Detalle de un state en una versión
+      tags:
+      - states
+  /api/search:
+    get:
+      description: "Busca sobre la versión vigente de cada state.\n\n* `type` usa GSI1, `name` usa GSI2,\
+        \ `project` consulta por clave; solo con atributos se hace\n  un Scan filtrado y acotado."
+      operationId: search_api_search_get
+      parameters:
+      - description: Tipo exacto, p. ej. aws_s3_bucket
+        in: query
+        name: type
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Tipo exacto, p. ej. aws_s3_bucket
+          title: Type
+      - description: Nombre exacto del recurso
+        in: query
+        name: name
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Nombre exacto del recurso
+          title: Name
+      - description: Módulo (contiene); `root` = raíz
+        in: query
+        name: module
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Módulo (contiene); `root` = raíz
+          title: Module
+      - in: query
+        name: project
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Project
+      - in: query
+        name: workspace
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Workspace
+      - description: Ruta exacta del state dentro del proyecto
+        in: query
+        name: path
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Ruta exacta del state dentro del proyecto
+          title: Path
+      - description: Clave de atributo (exacta o prefijo `a.`)
+        in: query
+        name: attribute_key
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Clave de atributo (exacta o prefijo `a.`)
+          title: Attribute Key
+      - description: Valor de atributo (contiene)
+        in: query
+        name: attribute_value
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          description: Valor de atributo (contiene)
+          title: Attribute Value
+      - in: query
+        name: limit
+        required: false
+        schema:
+          default: 100
+          maximum: 500
+          minimum: 1
+          title: Limit
+          type: integer
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Cursor
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResult'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Búsqueda de recursos
+      tags:
+      - search
