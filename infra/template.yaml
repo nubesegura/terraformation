@@ -1,0 +1,208 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Terraformation - visor serverless de Terraform states en S3 (sucesor moderno de terraboard).
+  Stack raíz: empaquetar con `aws cloudformation package` (ver Makefile).
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: { default: Origen de los states }
+        Parameters: [StateBucketName, StateBucketRegion, ManageBucketNotifications, DisableNotificationsOnDelete]
+      - Label: { default: General }
+        Parameters: [AppName, Environment, LogRetentionDays, LogLevel, EnableXRay]
+      - Label: { default: DynamoDB }
+        Parameters: [TableBillingMode, TableReadCapacity, TableWriteCapacity, IndexReadCapacity, IndexWriteCapacity, PointInTimeRecovery]
+      - Label: { default: Locks y sincronización }
+        Parameters: [LockAlertMinutes, ReconcileSchedule, ReconcileEnabled, IngestReservedConcurrency, MaxStateBytes, DlqRetentionSeconds, AlarmTopicArn]
+      - Label: { default: API y frontend }
+        Parameters: [ThrottlingRateLimit, ThrottlingBurstLimit, ExtraWebOrigin, EnablePlansApi, EnableBedrockSummary, BedrockModelId, CognitoDeletionProtection]
+
+Parameters:
+  AppName:
+    Type: String
+    Default: terraformation
+    AllowedPattern: "^[a-z][a-z0-9-]{1,23}$"
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+  StateBucketName:
+    Type: String
+    Description: Bucket S3 existente (con versionado) que contiene los Terraform states. No lo administra este stack.
+    AllowedPattern: "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+  StateBucketRegion:
+    Type: String
+    Description: Región del bucket de states. Debe coincidir con la región del despliegue (EventBridge entrega en la región del bucket).
+  ManageBucketNotifications:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: "true = un custom resource habilita EventBridge en el bucket preservando su configuración. false = activación manual (scripts/enable-eventbridge.sh)."
+  DisableNotificationsOnDelete:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Al borrar el stack, desactivar EventBridge en el bucket (por defecto se deja como está).
+  LogRetentionDays:
+    Type: Number
+    Default: 14
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90]
+  LogLevel:
+    Type: String
+    Default: INFO
+    AllowedValues: [DEBUG, INFO, WARNING, ERROR]
+  EnableXRay:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+  TableBillingMode:
+    Type: String
+    Default: PROVISIONED
+    AllowedValues: [PROVISIONED, PAY_PER_REQUEST]
+  TableReadCapacity: { Type: Number, Default: 5, MinValue: 1 }
+  TableWriteCapacity: { Type: Number, Default: 5, MinValue: 1 }
+  IndexReadCapacity: { Type: Number, Default: 2, MinValue: 1 }
+  IndexWriteCapacity: { Type: Number, Default: 5, MinValue: 1 }
+  PointInTimeRecovery:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+  LockAlertMinutes:
+    Type: Number
+    Default: 30
+    MinValue: 1
+  ReconcileSchedule:
+    Type: String
+    Default: rate(7 days)
+    Description: Expresión de EventBridge Scheduler (rate(...) o cron(...)).
+  ReconcileEnabled:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+  IngestReservedConcurrency:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    Description: 0 = sin concurrencia reservada. 1 serializa la ingesta (requiere cuota de cuenta suficiente).
+  MaxStateBytes:
+    Type: Number
+    Default: 41943040
+  DlqRetentionSeconds:
+    Type: Number
+    Default: 1209600
+  AlarmTopicArn:
+    Type: String
+    Default: ""
+    Description: Tópico SNS opcional para la alarma de la DLQ.
+  ThrottlingRateLimit: { Type: Number, Default: 20 }
+  ThrottlingBurstLimit: { Type: Number, Default: 40 }
+  ExtraWebOrigin:
+    Type: String
+    Default: ""
+    Description: Origen extra para desarrollo local (CORS y callback de Cognito), p. ej. http://localhost:8080
+  EnablePlansApi:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+  EnableBedrockSummary:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+  BedrockModelId:
+    Type: String
+    Default: anthropic.claude-haiku-4-5-20251001-v1:0
+  CognitoDeletionProtection:
+    Type: String
+    Default: INACTIVE
+    AllowedValues: [ACTIVE, INACTIVE]
+
+Rules:
+  BucketRegionMatchesStack:
+    Assertions:
+      - Assert: !Equals [!Ref StateBucketRegion, !Ref "AWS::Region"]
+        AssertDescription: El stack debe desplegarse en la misma región que el bucket de states.
+
+Resources:
+  Storage:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: nested/storage.yaml
+      Parameters:
+        AppName: !Ref AppName
+        Environment: !Ref Environment
+        BillingMode: !Ref TableBillingMode
+        TableReadCapacity: !Ref TableReadCapacity
+        TableWriteCapacity: !Ref TableWriteCapacity
+        IndexReadCapacity: !Ref IndexReadCapacity
+        IndexWriteCapacity: !Ref IndexWriteCapacity
+        PointInTimeRecovery: !Ref PointInTimeRecovery
+        DlqRetentionSeconds: !Ref DlqRetentionSeconds
+        AlarmTopicArn: !Ref AlarmTopicArn
+
+  Web:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: nested/web.yaml
+      Parameters:
+        AppName: !Ref AppName
+        Environment: !Ref Environment
+
+  Ingestion:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: nested/ingestion.yaml
+      Parameters:
+        AppName: !Ref AppName
+        Environment: !Ref Environment
+        StateBucketName: !Ref StateBucketName
+        TableName: !GetAtt Storage.Outputs.TableName
+        TableArn: !GetAtt Storage.Outputs.TableArn
+        DlqArn: !GetAtt Storage.Outputs.DlqArn
+        DlqUrl: !GetAtt Storage.Outputs.DlqUrl
+        LockAlertMinutes: !Ref LockAlertMinutes
+        ReconcileSchedule: !Ref ReconcileSchedule
+        ReconcileEnabled: !Ref ReconcileEnabled
+        LogRetentionDays: !Ref LogRetentionDays
+        LogLevel: !Ref LogLevel
+        EnableXRay: !Ref EnableXRay
+        ManageBucketNotifications: !Ref ManageBucketNotifications
+        DisableNotificationsOnDelete: !Ref DisableNotificationsOnDelete
+        IngestReservedConcurrency: !Ref IngestReservedConcurrency
+        MaxStateBytes: !Ref MaxStateBytes
+
+  Api:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: nested/api.yaml
+      Parameters:
+        AppName: !Ref AppName
+        Environment: !Ref Environment
+        StateBucketName: !Ref StateBucketName
+        TableName: !GetAtt Storage.Outputs.TableName
+        TableArn: !GetAtt Storage.Outputs.TableArn
+        WebDomain: !GetAtt Web.Outputs.DomainName
+        ExtraWebOrigin: !Ref ExtraWebOrigin
+        LockAlertMinutes: !Ref LockAlertMinutes
+        LogRetentionDays: !Ref LogRetentionDays
+        LogLevel: !Ref LogLevel
+        EnableXRay: !Ref EnableXRay
+        ThrottlingRateLimit: !Ref ThrottlingRateLimit
+        ThrottlingBurstLimit: !Ref ThrottlingBurstLimit
+        EnablePlansApi: !Ref EnablePlansApi
+        EnableBedrockSummary: !Ref EnableBedrockSummary
+        BedrockModelId: !Ref BedrockModelId
+        CognitoDeletionProtection: !Ref CognitoDeletionProtection
+        MaxStateBytes: !Ref MaxStateBytes
+
+Outputs:
+  WebUrl: { Value: !Sub "https://${Web.Outputs.DomainName}" }
+  WebBucketName: { Value: !GetAtt Web.Outputs.BucketName }
+  DistributionId: { Value: !GetAtt Web.Outputs.DistributionId }
+  ApiUrl: { Value: !GetAtt Api.Outputs.ApiUrl }
+  UserPoolId: { Value: !GetAtt Api.Outputs.UserPoolId }
+  SpaClientId: { Value: !GetAtt Api.Outputs.SpaClientId }
+  CognitoDomain: { Value: !GetAtt Api.Outputs.CognitoDomain }
+  TableName: { Value: !GetAtt Storage.Outputs.TableName }
+  DlqUrl: { Value: !GetAtt Storage.Outputs.DlqUrl }
+  BackfillFunctionName: { Value: !GetAtt Ingestion.Outputs.BackfillFunctionName }
+  ReconcileFunctionName: { Value: !GetAtt Ingestion.Outputs.ReconcileFunctionName }

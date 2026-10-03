@@ -1,0 +1,1813 @@
+{
+ "schema_version": 1,
+ "reviewed_at": "2026-10-03",
+ "stale_after_days": 180,
+ "_doc": "Mapa curado Terraform -> recursos AWS (tipos de CloudFormation). Ver docs/AWS_MAP.md. Lo que no este aqui se muestra como 'Sin mapear'; nunca se adivina.",
+ "entries": {
+  "aws_acm_certificate": {
+   "role": "primary",
+   "cfn_type": "AWS::CertificateManager::Certificate",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "domain_name"
+   ],
+   "status": "verified"
+  },
+  "aws_acm_certificate_validation": {
+   "role": "child",
+   "parent": {
+    "type": "aws_acm_certificate",
+    "child_attr": "certificate_arn",
+    "parent_attr": [
+     "arn",
+     "id"
+    ]
+   },
+   "status": "verified"
+  },
+  "aws_api_gateway_api_key": {
+   "role": "primary",
+   "cfn_type": "AWS::ApiGateway::ApiKey",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_api_gateway_authorizer": {
+   "role": "child",
+   "parent": {
+    "type": "aws_api_gateway_rest_api",
+    "child_attr": "rest_api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::ApiGateway::Authorizer"
+  },
+  "aws_api_gateway_deployment": {
+   "role": "child",
+   "parent": {
+    "type": "aws_api_gateway_rest_api",
+    "child_attr": "rest_api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::ApiGateway::Deployment"
+  },
+  "aws_api_gateway_gateway_response": {
+   "role": "child",
+   "parent": {
+    "type": "aws_api_gateway_rest_api",
+    "child_attr": "rest_api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::ApiGateway::GatewayResponse"
+  },
+  "aws_api_gateway_integration": {
+   "role": "child",
+   "parent": {
+    "type": "aws_api_gateway_rest_api",
+    "child_attr": "rest_api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_api_gateway_integration_response": {
+   "role": "child",
+   "parent": {
+    "type": "aws_api_gateway_rest_api",
+    "child_attr": "rest_api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_api_gateway_method": {
+   "role": "child",
+   "parent": {
+    "type": "aws_api_gateway_rest_api",
+    "child_attr": "rest_api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::ApiGateway::Method"
+  },
+  "aws_api_gateway_method_response": {
+   "role": "child",
+   "parent": {
+    "type": "aws_api_gateway_rest_api",
+    "child_attr": "rest_api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_api_gateway_model": {
+   "role": "child",
+   "parent": {
+    "type": "aws_api_gateway_rest_api",
+    "child_attr": "rest_api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::ApiGateway::Model"
+  },
+  "aws_api_gateway_resource": {
+   "role": "child",
+   "parent": {
+    "type": "aws_api_gateway_rest_api",
+    "child_attr": "rest_api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::ApiGateway::Resource"
+  },
+  "aws_api_gateway_rest_api": {
+   "role": "primary",
+   "cfn_type": "AWS::ApiGateway::RestApi",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_api_gateway_stage": {
+   "role": "child",
+   "parent": {
+    "type": "aws_api_gateway_rest_api",
+    "child_attr": "rest_api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::ApiGateway::Stage"
+  },
+  "aws_api_gateway_usage_plan": {
+   "role": "primary",
+   "cfn_type": "AWS::ApiGateway::UsagePlan",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_apigatewayv2_api": {
+   "role": "primary",
+   "cfn_type": "AWS::ApiGatewayV2::Api",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_apigatewayv2_api_mapping": {
+   "role": "child",
+   "parent": {
+    "type": "aws_apigatewayv2_api",
+    "child_attr": "api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::ApiGatewayV2::ApiMapping"
+  },
+  "aws_apigatewayv2_authorizer": {
+   "role": "child",
+   "parent": {
+    "type": "aws_apigatewayv2_api",
+    "child_attr": "api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::ApiGatewayV2::Authorizer"
+  },
+  "aws_apigatewayv2_deployment": {
+   "role": "child",
+   "parent": {
+    "type": "aws_apigatewayv2_api",
+    "child_attr": "api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::ApiGatewayV2::Deployment"
+  },
+  "aws_apigatewayv2_domain_name": {
+   "role": "primary",
+   "cfn_type": "AWS::ApiGatewayV2::DomainName",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "domain_name"
+   ],
+   "status": "provisional"
+  },
+  "aws_apigatewayv2_integration": {
+   "role": "child",
+   "parent": {
+    "type": "aws_apigatewayv2_api",
+    "child_attr": "api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::ApiGatewayV2::Integration"
+  },
+  "aws_apigatewayv2_integration_response": {
+   "role": "child",
+   "parent": {
+    "type": "aws_apigatewayv2_api",
+    "child_attr": "api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::ApiGatewayV2::IntegrationResponse"
+  },
+  "aws_apigatewayv2_model": {
+   "role": "child",
+   "parent": {
+    "type": "aws_apigatewayv2_api",
+    "child_attr": "api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::ApiGatewayV2::Model"
+  },
+  "aws_apigatewayv2_route": {
+   "role": "child",
+   "parent": {
+    "type": "aws_apigatewayv2_api",
+    "child_attr": "api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::ApiGatewayV2::Route"
+  },
+  "aws_apigatewayv2_route_response": {
+   "role": "child",
+   "parent": {
+    "type": "aws_apigatewayv2_api",
+    "child_attr": "api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::ApiGatewayV2::RouteResponse"
+  },
+  "aws_apigatewayv2_stage": {
+   "role": "child",
+   "parent": {
+    "type": "aws_apigatewayv2_api",
+    "child_attr": "api_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::ApiGatewayV2::Stage"
+  },
+  "aws_autoscaling_group": {
+   "role": "primary",
+   "cfn_type": "AWS::AutoScaling::AutoScalingGroup",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_backup_plan": {
+   "role": "primary",
+   "cfn_type": "AWS::Backup::BackupPlan",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_backup_selection": {
+   "role": "child",
+   "parent": {
+    "type": "aws_backup_plan",
+    "child_attr": "plan_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::Backup::BackupSelection"
+  },
+  "aws_backup_vault": {
+   "role": "primary",
+   "cfn_type": "AWS::Backup::BackupVault",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_cloudformation_stack": {
+   "role": "primary",
+   "cfn_type": "AWS::CloudFormation::Stack",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_cloudfront_cache_policy": {
+   "role": "primary",
+   "cfn_type": "AWS::CloudFront::CachePolicy",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_cloudfront_distribution": {
+   "role": "primary",
+   "cfn_type": "AWS::CloudFront::Distribution",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "domain_name"
+   ],
+   "status": "verified"
+  },
+  "aws_cloudfront_function": {
+   "role": "primary",
+   "cfn_type": "AWS::CloudFront::Function",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_cloudfront_origin_access_control": {
+   "role": "primary",
+   "cfn_type": "AWS::CloudFront::OriginAccessControl",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_cloudfront_response_headers_policy": {
+   "role": "primary",
+   "cfn_type": "AWS::CloudFront::ResponseHeadersPolicy",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_cloudtrail": {
+   "role": "primary",
+   "cfn_type": "AWS::CloudTrail::Trail",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_cloudwatch_dashboard": {
+   "role": "primary",
+   "cfn_type": "AWS::CloudWatch::Dashboard",
+   "identity": [
+    "dashboard_arn",
+    "id"
+   ],
+   "name": [
+    "dashboard_name"
+   ],
+   "status": "provisional"
+  },
+  "aws_cloudwatch_event_bus": {
+   "role": "primary",
+   "cfn_type": "AWS::Events::EventBus",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_cloudwatch_event_rule": {
+   "role": "primary",
+   "cfn_type": "AWS::Events::Rule",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_cloudwatch_event_target": {
+   "role": "child",
+   "parent": {
+    "type": "aws_cloudwatch_event_rule",
+    "child_attr": "rule",
+    "parent_attr": [
+     "name",
+     "id"
+    ]
+   },
+   "status": "verified"
+  },
+  "aws_cloudwatch_log_group": {
+   "role": "primary",
+   "cfn_type": "AWS::Logs::LogGroup",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_cloudwatch_log_stream": {
+   "role": "primary",
+   "cfn_type": "AWS::Logs::LogStream",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_cloudwatch_metric_alarm": {
+   "role": "primary",
+   "cfn_type": "AWS::CloudWatch::Alarm",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "alarm_name"
+   ],
+   "status": "verified"
+  },
+  "aws_cognito_identity_pool": {
+   "role": "primary",
+   "cfn_type": "AWS::Cognito::IdentityPool",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "identity_pool_name"
+   ],
+   "status": "provisional"
+  },
+  "aws_cognito_identity_provider": {
+   "role": "child",
+   "parent": {
+    "type": "aws_cognito_user_pool",
+    "child_attr": "user_pool_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::Cognito::UserPoolIdentityProvider"
+  },
+  "aws_cognito_managed_user_pool_client": {
+   "role": "child",
+   "parent": {
+    "type": "aws_cognito_user_pool",
+    "child_attr": "user_pool_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::Cognito::UserPoolClient"
+  },
+  "aws_cognito_resource_server": {
+   "role": "child",
+   "parent": {
+    "type": "aws_cognito_user_pool",
+    "child_attr": "user_pool_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::Cognito::UserPoolResourceServer"
+  },
+  "aws_cognito_user_group": {
+   "role": "child",
+   "parent": {
+    "type": "aws_cognito_user_pool",
+    "child_attr": "user_pool_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::Cognito::UserPoolGroup"
+  },
+  "aws_cognito_user_pool": {
+   "role": "primary",
+   "cfn_type": "AWS::Cognito::UserPool",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_cognito_user_pool_client": {
+   "role": "child",
+   "parent": {
+    "type": "aws_cognito_user_pool",
+    "child_attr": "user_pool_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::Cognito::UserPoolClient"
+  },
+  "aws_cognito_user_pool_domain": {
+   "role": "child",
+   "parent": {
+    "type": "aws_cognito_user_pool",
+    "child_attr": "user_pool_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::Cognito::UserPoolDomain"
+  },
+  "aws_db_instance": {
+   "role": "primary",
+   "cfn_type": "AWS::RDS::DBInstance",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "identifier"
+   ],
+   "status": "verified"
+  },
+  "aws_db_parameter_group": {
+   "role": "primary",
+   "cfn_type": "AWS::RDS::DBParameterGroup",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_db_proxy": {
+   "role": "primary",
+   "cfn_type": "AWS::RDS::DBProxy",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_db_subnet_group": {
+   "role": "primary",
+   "cfn_type": "AWS::RDS::DBSubnetGroup",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_dynamodb_table": {
+   "role": "primary",
+   "cfn_type": "AWS::DynamoDB::Table",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_dynamodb_table_item": {
+   "role": "child",
+   "parent": {
+    "type": "aws_dynamodb_table",
+    "child_attr": "table_name",
+    "parent_attr": [
+     "name",
+     "id"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_ebs_volume": {
+   "role": "primary",
+   "cfn_type": "AWS::EC2::Volume",
+   "identity": [
+    "id"
+   ],
+   "status": "provisional"
+  },
+  "aws_ecr_lifecycle_policy": {
+   "role": "child",
+   "parent": {
+    "type": "aws_ecr_repository",
+    "child_attr": "repository",
+    "parent_attr": [
+     "name",
+     "id"
+    ]
+   },
+   "status": "verified"
+  },
+  "aws_ecr_repository": {
+   "role": "primary",
+   "cfn_type": "AWS::ECR::Repository",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_ecr_repository_policy": {
+   "role": "child",
+   "parent": {
+    "type": "aws_ecr_repository",
+    "child_attr": "repository",
+    "parent_attr": [
+     "name",
+     "id"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_ecs_cluster": {
+   "role": "primary",
+   "cfn_type": "AWS::ECS::Cluster",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_ecs_service": {
+   "role": "primary",
+   "cfn_type": "AWS::ECS::Service",
+   "identity": [
+    "id",
+    "arn"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_ecs_task_definition": {
+   "role": "primary",
+   "cfn_type": "AWS::ECS::TaskDefinition",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "family"
+   ],
+   "status": "verified"
+  },
+  "aws_efs_access_point": {
+   "role": "primary",
+   "cfn_type": "AWS::EFS::AccessPoint",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "status": "provisional"
+  },
+  "aws_efs_file_system": {
+   "role": "primary",
+   "cfn_type": "AWS::EFS::FileSystem",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "status": "provisional"
+  },
+  "aws_efs_mount_target": {
+   "role": "primary",
+   "cfn_type": "AWS::EFS::MountTarget",
+   "identity": [
+    "id"
+   ],
+   "status": "provisional"
+  },
+  "aws_eip": {
+   "role": "primary",
+   "cfn_type": "AWS::EC2::EIP",
+   "identity": [
+    "id",
+    "allocation_id"
+   ],
+   "status": "provisional"
+  },
+  "aws_elasticache_replication_group": {
+   "role": "primary",
+   "cfn_type": "AWS::ElastiCache::ReplicationGroup",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "status": "provisional"
+  },
+  "aws_elasticache_subnet_group": {
+   "role": "primary",
+   "cfn_type": "AWS::ElastiCache::SubnetGroup",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_flow_log": {
+   "role": "primary",
+   "cfn_type": "AWS::EC2::FlowLog",
+   "identity": [
+    "id"
+   ],
+   "status": "provisional"
+  },
+  "aws_iam_access_key": {
+   "role": "child",
+   "parent": {
+    "type": "aws_iam_user",
+    "child_attr": "user",
+    "parent_attr": [
+     "name",
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::IAM::AccessKey"
+  },
+  "aws_iam_group": {
+   "role": "primary",
+   "cfn_type": "AWS::IAM::Group",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_iam_instance_profile": {
+   "role": "primary",
+   "cfn_type": "AWS::IAM::InstanceProfile",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_iam_openid_connect_provider": {
+   "role": "primary",
+   "cfn_type": "AWS::IAM::OIDCProvider",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "status": "provisional"
+  },
+  "aws_iam_policy": {
+   "role": "primary",
+   "cfn_type": "AWS::IAM::ManagedPolicy",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_iam_role": {
+   "role": "primary",
+   "cfn_type": "AWS::IAM::Role",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_iam_role_policy": {
+   "role": "child",
+   "parent": {
+    "type": "aws_iam_role",
+    "child_attr": "role",
+    "parent_attr": [
+     "name",
+     "id"
+    ]
+   },
+   "status": "verified"
+  },
+  "aws_iam_role_policy_attachment": {
+   "role": "child",
+   "parent": {
+    "type": "aws_iam_role",
+    "child_attr": "role",
+    "parent_attr": [
+     "name",
+     "id"
+    ]
+   },
+   "status": "verified"
+  },
+  "aws_iam_user": {
+   "role": "primary",
+   "cfn_type": "AWS::IAM::User",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_iam_user_policy": {
+   "role": "child",
+   "parent": {
+    "type": "aws_iam_user",
+    "child_attr": "user",
+    "parent_attr": [
+     "name",
+     "id"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_iam_user_policy_attachment": {
+   "role": "child",
+   "parent": {
+    "type": "aws_iam_user",
+    "child_attr": "user",
+    "parent_attr": [
+     "name",
+     "id"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_instance": {
+   "role": "primary",
+   "cfn_type": "AWS::EC2::Instance",
+   "identity": [
+    "id"
+   ],
+   "status": "verified"
+  },
+  "aws_internet_gateway": {
+   "role": "primary",
+   "cfn_type": "AWS::EC2::InternetGateway",
+   "identity": [
+    "id"
+   ],
+   "status": "verified"
+  },
+  "aws_key_pair": {
+   "role": "primary",
+   "cfn_type": "AWS::EC2::KeyPair",
+   "identity": [
+    "key_name",
+    "id"
+   ],
+   "status": "provisional"
+  },
+  "aws_kinesis_firehose_delivery_stream": {
+   "role": "primary",
+   "cfn_type": "AWS::KinesisFirehose::DeliveryStream",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_kinesis_stream": {
+   "role": "primary",
+   "cfn_type": "AWS::Kinesis::Stream",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_kms_alias": {
+   "role": "child",
+   "parent": {
+    "type": "aws_kms_key",
+    "child_attr": "target_key_id",
+    "parent_attr": [
+     "key_id",
+     "id",
+     "arn"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::KMS::Alias"
+  },
+  "aws_kms_key": {
+   "role": "primary",
+   "cfn_type": "AWS::KMS::Key",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "description"
+   ],
+   "status": "verified"
+  },
+  "aws_kms_key_policy": {
+   "role": "child",
+   "parent": {
+    "type": "aws_kms_key",
+    "child_attr": "key_id",
+    "parent_attr": [
+     "key_id",
+     "id",
+     "arn"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_lambda_alias": {
+   "role": "child",
+   "parent": {
+    "type": "aws_lambda_function",
+    "child_attr": "function_name",
+    "parent_attr": [
+     "function_name",
+     "arn"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::Lambda::Alias"
+  },
+  "aws_lambda_event_source_mapping": {
+   "role": "child",
+   "parent": {
+    "type": "aws_lambda_function",
+    "child_attr": "function_name",
+    "parent_attr": [
+     "function_name",
+     "arn"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::Lambda::EventSourceMapping"
+  },
+  "aws_lambda_function": {
+   "role": "primary",
+   "cfn_type": "AWS::Lambda::Function",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "function_name"
+   ],
+   "status": "verified"
+  },
+  "aws_lambda_function_event_invoke_config": {
+   "role": "child",
+   "parent": {
+    "type": "aws_lambda_function",
+    "child_attr": "function_name",
+    "parent_attr": [
+     "function_name",
+     "arn"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::Lambda::EventInvokeConfig"
+  },
+  "aws_lambda_function_url": {
+   "role": "child",
+   "parent": {
+    "type": "aws_lambda_function",
+    "child_attr": "function_name",
+    "parent_attr": [
+     "function_name",
+     "arn"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::Lambda::Url"
+  },
+  "aws_lambda_layer_version": {
+   "role": "primary",
+   "cfn_type": "AWS::Lambda::LayerVersion",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "layer_name"
+   ],
+   "status": "provisional"
+  },
+  "aws_lambda_permission": {
+   "role": "child",
+   "parent": {
+    "type": "aws_lambda_function",
+    "child_attr": "function_name",
+    "parent_attr": [
+     "function_name",
+     "arn"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::Lambda::Permission"
+  },
+  "aws_lambda_provisioned_concurrency_config": {
+   "role": "child",
+   "parent": {
+    "type": "aws_lambda_function",
+    "child_attr": "function_name",
+    "parent_attr": [
+     "function_name",
+     "arn"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_launch_template": {
+   "role": "primary",
+   "cfn_type": "AWS::EC2::LaunchTemplate",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_lb": {
+   "role": "primary",
+   "cfn_type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_lb_listener": {
+   "role": "child",
+   "parent": {
+    "type": "aws_lb",
+    "child_attr": "load_balancer_arn",
+    "parent_attr": [
+     "arn",
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::ElasticLoadBalancingV2::Listener"
+  },
+  "aws_lb_listener_rule": {
+   "role": "child",
+   "parent": {
+    "type": "aws_lb_listener",
+    "child_attr": "listener_arn",
+    "parent_attr": [
+     "arn",
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::ElasticLoadBalancingV2::ListenerRule"
+  },
+  "aws_lb_target_group": {
+   "role": "primary",
+   "cfn_type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_nat_gateway": {
+   "role": "primary",
+   "cfn_type": "AWS::EC2::NatGateway",
+   "identity": [
+    "id"
+   ],
+   "status": "provisional"
+  },
+  "aws_network_acl": {
+   "role": "primary",
+   "cfn_type": "AWS::EC2::NetworkAcl",
+   "identity": [
+    "id"
+   ],
+   "status": "provisional"
+  },
+  "aws_network_acl_rule": {
+   "role": "child",
+   "parent": {
+    "type": "aws_network_acl",
+    "child_attr": "network_acl_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::EC2::NetworkAclEntry"
+  },
+  "aws_rds_cluster": {
+   "role": "primary",
+   "cfn_type": "AWS::RDS::DBCluster",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "cluster_identifier"
+   ],
+   "status": "verified"
+  },
+  "aws_rds_cluster_instance": {
+   "role": "primary",
+   "cfn_type": "AWS::RDS::DBInstance",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "identifier"
+   ],
+   "status": "provisional"
+  },
+  "aws_route": {
+   "role": "child",
+   "parent": {
+    "type": "aws_route_table",
+    "child_attr": "route_table_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::EC2::Route"
+  },
+  "aws_route53_health_check": {
+   "role": "primary",
+   "cfn_type": "AWS::Route53::HealthCheck",
+   "identity": [
+    "id"
+   ],
+   "status": "provisional"
+  },
+  "aws_route53_record": {
+   "role": "child",
+   "parent": {
+    "type": "aws_route53_zone",
+    "child_attr": "zone_id",
+    "parent_attr": [
+     "zone_id",
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::Route53::RecordSet"
+  },
+  "aws_route53_zone": {
+   "role": "primary",
+   "cfn_type": "AWS::Route53::HostedZone",
+   "identity": [
+    "zone_id",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_route_table": {
+   "role": "primary",
+   "cfn_type": "AWS::EC2::RouteTable",
+   "identity": [
+    "id"
+   ],
+   "status": "verified"
+  },
+  "aws_route_table_association": {
+   "role": "child",
+   "parent": {
+    "type": "aws_route_table",
+    "child_attr": "route_table_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::EC2::SubnetRouteTableAssociation"
+  },
+  "aws_s3_bucket": {
+   "role": "primary",
+   "cfn_type": "AWS::S3::Bucket",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "bucket"
+   ],
+   "status": "verified"
+  },
+  "aws_s3_bucket_accelerate_configuration": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_s3_bucket_acl": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_s3_bucket_cors_configuration": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_s3_bucket_intelligent_tiering_configuration": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_s3_bucket_inventory": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_s3_bucket_lifecycle_configuration": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "verified"
+  },
+  "aws_s3_bucket_logging": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_s3_bucket_metric": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_s3_bucket_notification": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_s3_bucket_object_lock_configuration": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_s3_bucket_ownership_controls": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_s3_bucket_policy": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::S3::BucketPolicy"
+  },
+  "aws_s3_bucket_public_access_block": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "verified"
+  },
+  "aws_s3_bucket_replication_configuration": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_s3_bucket_request_payment_configuration": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_s3_bucket_server_side_encryption_configuration": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "verified"
+  },
+  "aws_s3_bucket_versioning": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "verified"
+  },
+  "aws_s3_bucket_website_configuration": {
+   "role": "child",
+   "parent": {
+    "type": "aws_s3_bucket",
+    "child_attr": "bucket",
+    "parent_attr": [
+     "id",
+     "bucket"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_scheduler_schedule": {
+   "role": "primary",
+   "cfn_type": "AWS::Scheduler::Schedule",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_secretsmanager_secret": {
+   "role": "primary",
+   "cfn_type": "AWS::SecretsManager::Secret",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_secretsmanager_secret_policy": {
+   "role": "child",
+   "parent": {
+    "type": "aws_secretsmanager_secret",
+    "child_attr": "secret_arn",
+    "parent_attr": [
+     "arn"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::SecretsManager::ResourcePolicy"
+  },
+  "aws_secretsmanager_secret_rotation": {
+   "role": "child",
+   "parent": {
+    "type": "aws_secretsmanager_secret",
+    "child_attr": "secret_id",
+    "parent_attr": [
+     "arn",
+     "id"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_secretsmanager_secret_version": {
+   "role": "child",
+   "parent": {
+    "type": "aws_secretsmanager_secret",
+    "child_attr": "secret_id",
+    "parent_attr": [
+     "arn",
+     "id"
+    ]
+   },
+   "status": "verified"
+  },
+  "aws_security_group": {
+   "role": "primary",
+   "cfn_type": "AWS::EC2::SecurityGroup",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_security_group_rule": {
+   "role": "child",
+   "parent": {
+    "type": "aws_security_group",
+    "child_attr": "security_group_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified"
+  },
+  "aws_sfn_state_machine": {
+   "role": "primary",
+   "cfn_type": "AWS::StepFunctions::StateMachine",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_sns_topic": {
+   "role": "primary",
+   "cfn_type": "AWS::SNS::Topic",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_sns_topic_policy": {
+   "role": "child",
+   "parent": {
+    "type": "aws_sns_topic",
+    "child_attr": "arn",
+    "parent_attr": [
+     "arn"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::SNS::TopicPolicy"
+  },
+  "aws_sns_topic_subscription": {
+   "role": "primary",
+   "cfn_type": "AWS::SNS::Subscription",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "status": "provisional"
+  },
+  "aws_sqs_queue": {
+   "role": "primary",
+   "cfn_type": "AWS::SQS::Queue",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "verified"
+  },
+  "aws_sqs_queue_policy": {
+   "role": "child",
+   "parent": {
+    "type": "aws_sqs_queue",
+    "child_attr": "queue_url",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::SQS::QueuePolicy"
+  },
+  "aws_sqs_queue_redrive_allow_policy": {
+   "role": "child",
+   "parent": {
+    "type": "aws_sqs_queue",
+    "child_attr": "queue_url",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_sqs_queue_redrive_policy": {
+   "role": "child",
+   "parent": {
+    "type": "aws_sqs_queue",
+    "child_attr": "queue_url",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "provisional"
+  },
+  "aws_ssm_parameter": {
+   "role": "primary",
+   "cfn_type": "AWS::SSM::Parameter",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_subnet": {
+   "role": "primary",
+   "cfn_type": "AWS::EC2::Subnet",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "cidr_block"
+   ],
+   "status": "verified"
+  },
+  "aws_vpc": {
+   "role": "primary",
+   "cfn_type": "AWS::EC2::VPC",
+   "identity": [
+    "id"
+   ],
+   "status": "verified"
+  },
+  "aws_vpc_endpoint": {
+   "role": "primary",
+   "cfn_type": "AWS::EC2::VPCEndpoint",
+   "identity": [
+    "id"
+   ],
+   "name": [
+    "service_name"
+   ],
+   "status": "provisional"
+  },
+  "aws_vpc_security_group_egress_rule": {
+   "role": "child",
+   "parent": {
+    "type": "aws_security_group",
+    "child_attr": "security_group_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::EC2::SecurityGroupEgress"
+  },
+  "aws_vpc_security_group_ingress_rule": {
+   "role": "child",
+   "parent": {
+    "type": "aws_security_group",
+    "child_attr": "security_group_id",
+    "parent_attr": [
+     "id"
+    ]
+   },
+   "status": "verified",
+   "cfn_type": "AWS::EC2::SecurityGroupIngress"
+  },
+  "aws_wafv2_web_acl": {
+   "role": "primary",
+   "cfn_type": "AWS::WAFv2::WebACL",
+   "identity": [
+    "arn",
+    "id"
+   ],
+   "name": [
+    "name"
+   ],
+   "status": "provisional"
+  },
+  "aws_wafv2_web_acl_association": {
+   "role": "child",
+   "parent": {
+    "type": "aws_wafv2_web_acl",
+    "child_attr": "web_acl_arn",
+    "parent_attr": [
+     "arn"
+    ]
+   },
+   "status": "provisional",
+   "cfn_type": "AWS::WAFv2::WebACLAssociation"
+  }
+ }
+}

@@ -1,0 +1,47 @@
+# Reglas cfn-guard del proyecto (se ejecutan con `make guard`).
+
+let s3_buckets = Resources.*[ Type == 'AWS::S3::Bucket' ]
+rule s3_private_and_encrypted when %s3_buckets !empty {
+    %s3_buckets.Properties.PublicAccessBlockConfiguration.BlockPublicAcls == true
+    %s3_buckets.Properties.PublicAccessBlockConfiguration.BlockPublicPolicy == true
+    %s3_buckets.Properties.PublicAccessBlockConfiguration.IgnorePublicAcls == true
+    %s3_buckets.Properties.PublicAccessBlockConfiguration.RestrictPublicBuckets == true
+    %s3_buckets.Properties.BucketEncryption exists
+}
+
+let queues = Resources.*[ Type == 'AWS::SQS::Queue' ]
+rule sqs_encrypted when %queues !empty {
+    %queues.Properties.SqsManagedSseEnabled == true
+}
+
+let tables = Resources.*[ Type == 'AWS::DynamoDB::Table' ]
+rule dynamodb_sse_and_ttl when %tables !empty {
+    %tables.Properties.SSESpecification.SSEEnabled == true
+    %tables.Properties.TimeToLiveSpecification.Enabled == true
+}
+
+let log_groups = Resources.*[ Type == 'AWS::Logs::LogGroup' ]
+rule log_groups_have_retention when %log_groups !empty {
+    %log_groups.Properties.RetentionInDays exists
+}
+
+let roles = Resources.*[ Type == 'AWS::IAM::Role' ]
+rule iam_no_admin_wildcards when %roles !empty {
+    %roles.Properties.Policies[*].PolicyDocument.Statement[ Action exists ].Action != '*'
+    %roles.Properties.Policies[*].PolicyDocument.Statement[ Action exists ].Action != 's3:*'
+    %roles.Properties.Policies[*].PolicyDocument.Statement[ Action exists ].Action != 'dynamodb:*'
+}
+
+let functions = Resources.*[ Type == 'AWS::Serverless::Function' ]
+rule lambda_python313_arm64 when %functions !empty {
+    Globals.Function.Runtime == 'python3.13'
+    Globals.Function.Architectures[*] == 'arm64'
+    %functions.Properties.Role exists
+}
+
+let apis = Resources.*[ Type == 'AWS::Serverless::HttpApi' ]
+rule http_api_jwt_cors_throttling when %apis !empty {
+    %apis.Properties.Auth.DefaultAuthorizer exists
+    %apis.Properties.CorsConfiguration.AllowOrigins exists
+    %apis.Properties.DefaultRouteSettings.ThrottlingRateLimit exists
+}

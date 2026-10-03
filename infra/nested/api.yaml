@@ -1,0 +1,370 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Terraformation - Cognito (managed login), HTTP API con authorizer JWT y Lambdas FastAPI
+
+Parameters:
+  AppName: { Type: String }
+  Environment: { Type: String }
+  StateBucketName: { Type: String }
+  TableName: { Type: String }
+  TableArn: { Type: String }
+  WebDomain: { Type: String, Description: Dominio de CloudFront (sin https://) }
+  ExtraWebOrigin: { Type: String, Default: "", Description: "Origen adicional para desarrollo local (p. ej. http://localhost:8080)" }
+  LockAlertMinutes: { Type: Number }
+  LogRetentionDays: { Type: Number }
+  LogLevel: { Type: String }
+  EnableXRay: { Type: String, AllowedValues: ["true", "false"] }
+  ThrottlingRateLimit: { Type: Number }
+  ThrottlingBurstLimit: { Type: Number }
+  EnablePlansApi: { Type: String, AllowedValues: ["true", "false"] }
+  EnableBedrockSummary: { Type: String, AllowedValues: ["true", "false"] }
+  BedrockModelId: { Type: String }
+  CognitoDeletionProtection: { Type: String, AllowedValues: [ACTIVE, INACTIVE] }
+  MaxStateBytes: { Type: Number }
+
+Conditions:
+  XRayOn: !Equals [!Ref EnableXRay, "true"]
+  PlansOn: !Equals [!Ref EnablePlansApi, "true"]
+  BedrockOn: !Equals [!Ref EnableBedrockSummary, "true"]
+  HasExtraOrigin: !Not [!Equals [!Ref ExtraWebOrigin, ""]]
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Architectures: [arm64]
+    MemorySize: 512
+    Timeout: 29
+    Tracing: !If [XRayOn, Active, PassThrough]
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref TableName
+        STATE_BUCKET: !Ref StateBucketName
+        LOCK_ALERT_MINUTES: !Ref LockAlertMinutes
+        MAX_STATE_BYTES: !Ref MaxStateBytes
+        ENABLE_PLANS_API: !Ref EnablePlansApi
+        ENABLE_BEDROCK: !Ref EnableBedrockSummary
+        BEDROCK_MODEL_ID: !Ref BedrockModelId
+        POWERTOOLS_LOG_LEVEL: !Ref LogLevel
+        POWERTOOLS_TRACE_DISABLED: !If [XRayOn, "false", "true"]
+
+Resources:
+  # ------------------------------------------------------------------ Cognito
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${AppName}-${Environment}"
+      UserPoolTier: ESSENTIALS
+      DeletionProtection: !Ref CognitoDeletionProtection
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      MfaConfiguration: OPTIONAL
+      EnabledMfas: [SOFTWARE_TOKEN_MFA]
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 3
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - { Name: verified_email, Priority: 1 }
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Sub "${AppName}-${Environment}-${AWS::AccountId}"
+      ManagedLoginVersion: 2
+
+  SpaClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: !Sub "${AppName}-${Environment}-spa"
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile]
+      SupportedIdentityProviders: [COGNITO]
+      CallbackURLs: !If
+        - HasExtraOrigin
+        - [!Sub "https://${WebDomain}/", !Sub "${ExtraWebOrigin}/"]
+        - [!Sub "https://${WebDomain}/"]
+      LogoutURLs: !If
+        - HasExtraOrigin
+        - [!Sub "https://${WebDomain}/", !Sub "${ExtraWebOrigin}/"]
+        - [!Sub "https://${WebDomain}/"]
+      ExplicitAuthFlows: [ALLOW_REFRESH_TOKEN_AUTH]
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 12
+      TokenValidityUnits: { AccessToken: minutes, IdToken: minutes, RefreshToken: hours }
+
+  ManagedLoginBranding:
+    Type: AWS::Cognito::ManagedLoginBranding
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientId: !Ref SpaClient
+      UseCognitoProvidedValues: true
+
+  PlansResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Condition: PlansOn
+    Properties:
+      UserPoolId: !Ref UserPool
+      Identifier: terraformation
+      Name: Terraformation API
+      Scopes:
+        - { ScopeName: plans.write, ScopeDescription: Enviar planes (POST /api/plans) }
+
+  PlansClient:
+    Type: AWS::Cognito::UserPoolClient
+    Condition: PlansOn
+    DependsOn: PlansResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: !Sub "${AppName}-${Environment}-plans-ci"
+      GenerateSecret: true
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [client_credentials]
+      AllowedOAuthScopes: [terraformation/plans.write]
+      SupportedIdentityProviders: [COGNITO]
+      AccessTokenValidity: 60
+      TokenValidityUnits: { AccessToken: minutes }
+
+  # ------------------------------------------------------------------ HTTP API
+  ApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/apigateway/${AppName}-${Environment}-http"
+      RetentionInDays: !Ref LogRetentionDays
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_158
+            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+      guard:
+        SuppressedRules:
+          - CLOUDWATCH_LOG_GROUP_ENCRYPTED
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Description: !Sub "${AppName} ${Environment}"
+      CorsConfiguration:
+        # El !If va por elemento (no envolviendo la lista): SAM descarta CorsConfiguration si AllowOrigins es un !If.
+        AllowOrigins:
+          - !Sub "https://${WebDomain}"
+          - !If [HasExtraOrigin, !Ref ExtraWebOrigin, !Ref "AWS::NoValue"]
+        AllowMethods: [GET, POST, OPTIONS]
+        AllowHeaders: [authorization, content-type]
+        MaxAge: 600
+      Auth:
+        DefaultAuthorizer: CognitoJwt
+        Authorizers:
+          CognitoJwt:
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}"
+              audience: !If
+                - PlansOn
+                - [!Ref SpaClient, !Ref PlansClient]
+                - [!Ref SpaClient]
+      DefaultRouteSettings:
+        ThrottlingRateLimit: !Ref ThrottlingRateLimit
+        ThrottlingBurstLimit: !Ref ThrottlingBurstLimit
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
+        Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","route":"$context.routeKey","status":"$context.status","latency":"$context.responseLatency","sub":"$context.authorizer.claims.sub"}'
+
+  # ------------------------------------------------------------------ Lambda de lectura (FastAPI)
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AppName}-${Environment}-api"
+      RetentionInDays: !Ref LogRetentionDays
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_158
+            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+      guard:
+        SuppressedRules:
+          - CLOUDWATCH_LOG_GROUP_ENCRYPTED
+
+  ApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - { Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }
+      Policies:
+        - PolicyName: api-read
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt ApiLogGroup.Arn
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:Query, dynamodb:Scan]
+                Resource: [!Ref TableArn, !Sub "${TableArn}/index/*"]
+              - Effect: Allow
+                Action: [s3:GetObject, s3:GetObjectVersion]
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${StateBucketName}/*"
+              - !If
+                - BedrockOn
+                - Effect: Allow
+                  Action: bedrock:InvokeModel
+                  Resource:
+                    - !Sub "arn:${AWS::Partition}:bedrock:*::foundation-model/*"
+                    - !Sub "arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*"
+                - !Ref AWS::NoValue
+              - !If
+                - XRayOn
+                - { Effect: Allow, Action: [xray:PutTraceSegments, xray:PutTelemetryRecords], Resource: "*" }
+                - !Ref AWS::NoValue
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_290
+            comment: xray:Put* y bedrock:InvokeModel (modelo configurable) no admiten ARN fijo; solo con los parámetros activados
+          - id: CKV_AWS_355
+            comment: Resource "*" solo para X-Ray cuando EnableXRay=true
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AppName}-${Environment}-api"
+      Description: API REST de solo lectura (FastAPI + Mangum)
+      Handler: terraformation.handlers.api.handler
+      CodeUri: ../../backend/build/package/
+      Role: !GetAtt ApiRole.Arn
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref ApiLogGroup
+      Events:
+        # Métodos explícitos (no ANY): ANY incluiría OPTIONS y el preflight CORS pasaría por el autorizador
+        # JWT (401). Sin ruta OPTIONS, API Gateway responde el preflight por sí mismo.
+        ProxyGet:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/{proxy+}
+            Method: GET
+        ProxyPost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/{proxy+}
+            Method: POST
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_116
+            comment: Función síncrona detrás de API Gateway; no usa DLQ
+          - id: CKV_AWS_117
+            comment: Sin VPC
+          - id: CKV_AWS_173
+            comment: Variables de entorno sin secretos
+          - id: CKV_AWS_115
+            comment: El límite se aplica con throttling del API
+
+  # ------------------------------------------------------------------ Lambda de escritura de planes (opcional)
+  PlansLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: PlansOn
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AppName}-${Environment}-plans"
+      RetentionInDays: !Ref LogRetentionDays
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_158
+            comment: Cifrado con clave administrada por el servicio CloudWatch Logs; se evita el costo de una CMK de KMS
+      guard:
+        SuppressedRules:
+          - CLOUDWATCH_LOG_GROUP_ENCRYPTED
+
+  PlansRole:
+    Type: AWS::IAM::Role
+    Condition: PlansOn
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - { Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }
+      Policies:
+        - PolicyName: plans-write
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt PlansLogGroup.Arn
+              - Effect: Allow
+                Action: dynamodb:PutItem
+                Resource: !Ref TableArn
+              - !If
+                - XRayOn
+                - { Effect: Allow, Action: [xray:PutTraceSegments, xray:PutTelemetryRecords], Resource: "*" }
+                - !Ref AWS::NoValue
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_290
+            comment: xray:Put* no admite restricción por recurso
+          - id: CKV_AWS_355
+            comment: Resource "*" solo para X-Ray cuando EnableXRay=true
+
+  PlansFunction:
+    Type: AWS::Serverless::Function
+    Condition: PlansOn
+    Properties:
+      FunctionName: !Sub "${AppName}-${Environment}-plans"
+      Description: POST /api/plans (compatible con terraboard)
+      Handler: terraformation.handlers.plans.handler
+      CodeUri: ../../backend/build/package/
+      Role: !GetAtt PlansRole.Arn
+      MemorySize: 256
+      LoggingConfig:
+        LogFormat: JSON
+        LogGroup: !Ref PlansLogGroup
+      Events:
+        SubmitPlan:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /api/plans
+            Method: POST
+            Auth:
+              Authorizer: CognitoJwt
+              AuthorizationScopes: [terraformation/plans.write]
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_116
+            comment: Función síncrona detrás de API Gateway
+          - id: CKV_AWS_117
+            comment: Sin VPC
+          - id: CKV_AWS_173
+            comment: Sin secretos
+          - id: CKV_AWS_115
+            comment: El límite se aplica con throttling del API
+
+Outputs:
+  ApiUrl: { Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com" }
+  UserPoolId: { Value: !Ref UserPool }
+  SpaClientId: { Value: !Ref SpaClient }
+  PlansClientId:
+    Condition: PlansOn
+    Value: !Ref PlansClient
+  CognitoDomain: { Value: !Sub "https://${AppName}-${Environment}-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com" }
+  ApiFunctionName: { Value: !Ref ApiFunction }

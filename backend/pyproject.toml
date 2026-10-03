@@ -1,0 +1,64 @@
+[project]
+name = "terraformation"
+version = "0.1.0"
+description = "Visor serverless de Terraform states en S3 (sucesor moderno de terraboard)"
+requires-python = ">=3.13"
+license = { text = "Apache-2.0" }
+dependencies = [
+  "aws-lambda-powertools[tracer]>=3.0",
+  "pydantic>=2.7",
+  "fastapi>=0.115",
+  "mangum>=0.19",
+]
+
+[project.optional-dependencies]
+dev = [
+  "boto3",
+  "moto[dynamodb,s3,sqs,events]>=5",
+  "pytest",
+  "pytest-cov",
+  "httpx",
+  "ruff",
+  "mypy",
+  "boto3-stubs[dynamodb,s3,sqs,bedrock-runtime]",
+  "openapi-spec-validator",
+  "jsonschema",
+  "pyyaml",
+  "types-PyYAML",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py313"
+src = ["src", "tests"]
+extend-exclude = ["build"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "S", "C4", "RUF"]
+ignore = ["S101", "RUF012"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106", "S108", "E501"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q -W ignore::DeprecationWarning"

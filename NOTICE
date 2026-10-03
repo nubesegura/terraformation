@@ -1,0 +1,18 @@
+Terraformation
+Copyright 2026 The Terraformation contributors
+
+This product is licensed under the Apache License, Version 2.0.
+
+Acknowledgements
+----------------
+Terraformation is a serverless, AWS-only successor in spirit to Terraboard
+(https://github.com/camptocamp/terraboard), Copyright Camptocamp SA and
+contributors, licensed under the Apache License, Version 2.0.
+
+Terraboard was studied as a functional and behavioural reference (state
+parsing, storage model, state comparison, search and REST API semantics,
+packages state/, db/, compare/, api/ and types/). No Terraboard source code or
+architecture is reused: this project is a clean re-implementation in Python
+(Pydantic, FastAPI) on AWS serverless services, and a Flutter web frontend.
+The original Go sources remain available in the git history of this
+repository for reference.

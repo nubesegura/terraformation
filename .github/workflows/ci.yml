@@ -1,0 +1,66 @@
+name: CI
+
+# Un solo run por push: en `develop` y `main` el CI lo ejecuta `deploy.yml` (workflow_call) antes de
+# desplegar. Este workflow solo corre por sí mismo en los pull requests.
+on:
+  workflow_call:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (ruff, mypy, pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - name: Entorno Python 3.13
+        run: |
+          uv venv --python 3.13 .venv
+          uv pip install --python .venv/bin/python -e "backend[dev]"
+      - run: .venv/bin/ruff check backend scripts
+      - run: .venv/bin/ruff format --check backend scripts
+      - run: cd backend && ../.venv/bin/mypy src
+      - run: cd backend && ../.venv/bin/pytest --cov=terraformation
+      - name: Contrato OpenAPI sincronizado
+        run: |
+          .venv/bin/python scripts/export_openapi.py --check
+
+  infra:
+    name: Plantillas (cfn-lint, sam validate, checkov, cfn-guard)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+      - name: Herramientas
+        run: |
+          uv venv --python 3.13 .venv
+          uv pip install --python .venv/bin/python cfn-lint checkov aws-sam-cli
+          curl -sSL -o guard.tgz https://github.com/aws-cloudformation/cloudformation-guard/releases/download/3.2.1/cfn-guard-v3-ubuntu-latest.tar.gz
+          tar xzf guard.tgz && sudo mv cfn-guard-v3-ubuntu-latest/cfn-guard /usr/local/bin/
+      - run: make cfn-lint
+      - run: make sam-validate
+      - run: make aws-map-check
+      - run: make checkov
+      - run: make guard
+
+  frontend:
+    name: Frontend (flutter analyze, test, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          cache: true
+      - run: cd frontend && flutter pub get
+      - run: cd frontend && flutter analyze
+      - run: cd frontend && flutter test
+      - run: cd frontend && flutter build web --release --no-web-resources-cdn
