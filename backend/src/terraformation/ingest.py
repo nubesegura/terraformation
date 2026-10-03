@@ -1,4 +1,4 @@
-"""Ingesta de versiones de .tfstate: idempotente, tolerante a duplicados y desorden."""
+"""Ingestion of .tfstate versions: idempotent, tolerant to duplicates and out-of-order delivery."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ class Ctx:
     _cache: dict[tuple[str, str], ParsedState | None] = field(default_factory=dict)
 
     def load(self, key: str, version_id: str) -> ParsedState | None:
-        """Descarga y parsea una versión (con caché por invocación)."""
+        """Downloads and parses a version (cached per invocation)."""
         ck = (key, version_id)
         if ck not in self._cache:
             try:
@@ -51,7 +51,7 @@ def ingest_version(
     prev_hint: ParsedState | None = None,
     promote: bool = True,
 ) -> tuple[str, ParsedState | None]:
-    """Procesa una versión. Devuelve (estado, parseado): duplicate | ingested | unparsable."""
+    """Processes a version. Returns (status, parsed): duplicate | ingested | unparsable."""
     st = ctx.store
     if st.version_exists(ref, last_modified, version_id):
         return "duplicate", None
@@ -113,7 +113,7 @@ def ingest_version(
             st.sync_resources(ref, parsed.instances, sort)
             st.link_lineage(ref, parsed.lineage)
 
-    if succ_state is not None:  # llegó fuera de orden: el sucesor cambia de base de comparación
+    if succ_state is not None:  # arrived out of order: the successor changes its comparison base
         succ_parsed = ctx.load(succ_state["key"], succ_state["version_id"])
         if succ_parsed is not None:
             a, r, m = count_changes(parsed, succ_parsed)
@@ -162,7 +162,7 @@ def finalize_key(
     *,
     force: bool = False,
 ) -> str:
-    """Alinea el resumen con la realidad de S3 (``entries``: nuevo → antiguo)."""
+    """Aligns the summary with what is in S3 (``entries``: newest → oldest)."""
     st = ctx.store
     latest = next((e for e in entries if e.is_latest), entries[0] if entries else None)
     if latest is None:
@@ -200,7 +200,7 @@ def finalize_key(
 
 
 def remove_version(ctx: Ctx, ref: StateRef, version_id: str) -> bool:
-    """Elimina del historial una versión borrada permanentemente de S3."""
+    """Removes from the history a version permanently deleted from S3."""
     for item in ctx.store.list_versions(ref):
         if item["version_id"] == version_id:
             ctx.store.delete_item(ref, item["SK"])
@@ -209,7 +209,7 @@ def remove_version(ctx: Ctx, ref: StateRef, version_id: str) -> bool:
 
 
 def process_state_event(ctx: Ctx, event: dict[str, Any]) -> str:
-    """Procesa un evento ``Object Created`` / ``Object Deleted`` de EventBridge."""
+    """Processes an EventBridge ``Object Created`` / ``Object Deleted`` event."""
     detail = event.get("detail", {})
     key = detail.get("object", {}).get("key", "")
     version_id = detail.get("object", {}).get("version-id") or ""

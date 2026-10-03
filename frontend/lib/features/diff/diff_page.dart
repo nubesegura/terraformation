@@ -5,10 +5,12 @@ import 'package:go_router/go_router.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/models.dart';
 import '../../core/providers.dart';
+import '../../l10n/lang_provider.dart';
 import '../../core/state_ref.dart';
 import '../../shared/format.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets.dart';
+import '../../l10n/app_strings.dart';
 
 class DiffPage extends ConsumerWidget {
   const DiffPage({super.key, required this.stateRef, this.from, this.to});
@@ -25,7 +27,7 @@ class DiffPage extends ConsumerWidget {
       builder: (list) {
         final states = list.items.where((v) => v.readable).toList();
         if (states.length < 2) {
-          return const Center(child: Text('Se necesitan al menos dos versiones legibles para comparar.'));
+          return Center(child: Text(context.s.needTwoReadable));
         }
         final toId = to ?? states.first.versionId;
         final fromId = from ?? (states.length > 1 ? states[1].versionId : states.first.versionId);
@@ -57,6 +59,7 @@ class _DiffScaffold extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s = context.s;
     final diff = ref.watch(diffProvider((stateRef, from, to)));
     Widget picker(String label, String value, void Function(String) onChanged) => SizedBox(
           width: 320,
@@ -80,21 +83,21 @@ class _DiffScaffold extends ConsumerWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           IconButton(
-            tooltip: 'Volver al proyecto',
+            tooltip: s.backToProject,
             onPressed: () => context.go(stateLocation(stateRef, extra: {'tab': 'timeline'})),
             icon: const Icon(Icons.arrow_back),
           ),
-          Text('Comparar versiones · ${stateLabel(stateRef)}', style: Theme.of(context).textTheme.titleLarge),
+          Text(s.compareVersionsTitle(stateLabel(stateRef)), style: Theme.of(context).textTheme.titleLarge),
         ]),
         const SizedBox(height: 12),
         Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
-          picker('Desde (antigua)', from, (v) => _go(context, v, to)),
+          picker(s.fromOlder, from, (v) => _go(context, v, to)),
           IconButton(
-            tooltip: 'Intercambiar',
+            tooltip: s.swap,
             onPressed: () => _go(context, to, from),
             icon: const Icon(Icons.swap_horiz),
           ),
-          picker('Hasta (nueva)', to, (v) => _go(context, from, v)),
+          picker(s.toNewer, to, (v) => _go(context, from, v)),
         ]),
         const SizedBox(height: 12),
         Expanded(
@@ -126,6 +129,8 @@ class _DiffViewState extends ConsumerState<DiffView> {
   bool aiBusy = false;
 
   Future<void> _summarize() async {
+    final s = context.s;
+    final language = ref.read(langProvider).name;
     setState(() {
       aiBusy = true;
       aiError = null;
@@ -133,10 +138,10 @@ class _DiffViewState extends ConsumerState<DiffView> {
     try {
       final r = await ref
           .read(apiClientProvider)
-          .diffSummary(widget.stateRef, widget.diff.from.versionId, widget.diff.to.versionId);
+          .diffSummary(widget.stateRef, widget.diff.from.versionId, widget.diff.to.versionId, language: language);
       setState(() => aiText = r.summary);
     } on ApiException catch (e) {
-      setState(() => aiError = e.status == 501 ? 'El resumen con IA está desactivado en este despliegue.' : e.detail);
+      setState(() => aiError = e.status == 501 ? s.aiDisabled : e.detail);
     } finally {
       if (mounted) setState(() => aiBusy = false);
     }
@@ -145,16 +150,17 @@ class _DiffViewState extends ConsumerState<DiffView> {
   @override
   Widget build(BuildContext context) {
     final d = widget.diff;
+    final s = context.s;
     bool match(String a) => filter.isEmpty || a.toLowerCase().contains(filter.toLowerCase());
     final added = d.added.where((r) => match(r.address)).toList();
     final removed = d.removed.where((r) => match(r.address)).toList();
     final modified = d.modified.where((r) => match(r.address)).toList();
     return ListView(children: [
       Wrap(spacing: 10, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-        Tag('+${d.summary.added} agregados', color: Palette.added, icon: Icons.add_circle_outline),
-        Tag('−${d.summary.removed} eliminados', color: Palette.removed, icon: Icons.remove_circle_outline),
-        Tag('~${d.summary.modified} modificados', color: Palette.modified, icon: Icons.edit_outlined),
-        Tag('${d.summary.unchanged} sin cambios'),
+        Tag(s.diffAdded(d.summary.added), color: Palette.added, icon: Icons.add_circle_outline),
+        Tag(s.diffRemoved(d.summary.removed), color: Palette.removed, icon: Icons.remove_circle_outline),
+        Tag(s.diffModified(d.summary.modified), color: Palette.modified, icon: Icons.edit_outlined),
+        Tag(s.diffUnchanged(d.summary.unchanged)),
         Tag('serial ${d.from.serial} > ${d.to.serial}'),
         if (d.from.terraformVersion != d.to.terraformVersion)
           Tag('Terraform ${d.from.terraformVersion} > ${d.to.terraformVersion}', color: Palette.modified),
@@ -164,15 +170,15 @@ class _DiffViewState extends ConsumerState<DiffView> {
         SizedBox(
           width: 260,
           child: TextField(
-            decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.filter_alt_outlined), hintText: 'Filtrar recursos', isDense: true, border: OutlineInputBorder()),
+            decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.filter_alt_outlined), hintText: s.filterResources, isDense: true, border: const OutlineInputBorder()),
             onChanged: (v) => setState(() => filter = v),
           ),
         ),
         SegmentedButton<bool>(
-          segments: const [
-            ButtonSegment(value: true, label: Text('Lado a lado'), icon: Icon(Icons.view_column_outlined)),
-            ButtonSegment(value: false, label: Text('Unificado'), icon: Icon(Icons.view_stream_outlined)),
+          segments: [
+            ButtonSegment(value: true, label: Text(s.sideBySide), icon: const Icon(Icons.view_column_outlined)),
+            ButtonSegment(value: false, label: Text(s.unified), icon: const Icon(Icons.view_stream_outlined)),
           ],
           selected: {sideBySide},
           onSelectionChanged: (s) => setState(() => sideBySide = s.first),
@@ -182,7 +188,7 @@ class _DiffViewState extends ConsumerState<DiffView> {
           icon: aiBusy
               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.auto_awesome),
-          label: const Text('Resumir con IA'),
+          label: Text(s.summarizeWithAi),
         ),
       ]),
       if (aiText != null || aiError != null) ...[
@@ -198,7 +204,7 @@ class _DiffViewState extends ConsumerState<DiffView> {
       const SizedBox(height: 12),
       if (d.outputs.isNotEmpty)
         _Group(
-          title: 'Outputs (${d.outputs.length})',
+          title: s.outputsTitle(d.outputs.length),
           color: Palette.modified,
           children: [
             for (final o in d.outputs)
@@ -207,24 +213,24 @@ class _DiffViewState extends ConsumerState<DiffView> {
         ),
       if (added.isNotEmpty)
         _Group(
-          title: 'Agregados (${added.length})',
+          title: s.groupAdded(added.length),
           color: Palette.added,
           children: [for (final r in added) _ResourceBlock(r: r, kind: 'added')],
         ),
       if (removed.isNotEmpty)
         _Group(
-          title: 'Eliminados (${removed.length})',
+          title: s.groupRemoved(removed.length),
           color: Palette.removed,
           children: [for (final r in removed) _ResourceBlock(r: r, kind: 'removed')],
         ),
       if (modified.isNotEmpty)
         _Group(
-          title: 'Modificados (${modified.length})',
+          title: s.groupModified(modified.length),
           color: Palette.modified,
           children: [for (final r in modified) _ModifiedBlock(r: r, sideBySide: sideBySide)],
         ),
       if (added.isEmpty && removed.isEmpty && modified.isEmpty && d.outputs.isEmpty)
-        const Padding(padding: EdgeInsets.all(32), child: Center(child: Text('Sin diferencias.'))),
+        Padding(padding: const EdgeInsets.all(32), child: Center(child: Text(s.noDifferences))),
     ]);
   }
 }
@@ -304,17 +310,17 @@ class _ModifiedBlock extends StatelessWidget {
       title: Text(r.address, style: _mono),
       subtitle: Text(
         [
-          '${r.changes.length} atributos',
-          if (r.sensitiveChanged) 'valor sensible modificado',
-          if (r.dependenciesChanged) 'dependencias modificadas',
+          context.s.attributesCount(r.changes.length),
+          if (r.sensitiveChanged) context.s.sensitiveValueChanged,
+          if (r.dependenciesChanged) context.s.dependenciesChanged,
         ].join(' · '),
         style: Theme.of(context).textTheme.bodySmall,
       ),
       children: [
         if (r.changes.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(8),
-            child: Text('Cambió un valor sensible o las dependencias (los valores no se muestran).'),
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Text(context.s.sensitiveOrDepsNote),
           )
         else if (sideBySide)
           _SideBySide(changes: r.changes)

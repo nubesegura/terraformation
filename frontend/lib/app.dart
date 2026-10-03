@@ -11,7 +11,10 @@ import 'features/projects/project_page.dart';
 import 'features/projects/projects_page.dart';
 import 'features/search/search_page.dart';
 import 'features/shell/shell.dart';
+import 'l10n/language_button.dart';
+import 'l10n/lang_provider.dart';
 import 'shared/theme.dart';
+import 'l10n/app_strings.dart';
 
 StateRef _stateRef(GoRouterState s) => (
       project: s.pathParameters['project']!,
@@ -82,6 +85,8 @@ class TerraformationApp extends ConsumerWidget {
       darkTheme: buildTheme(Brightness.dark),
       themeMode: ref.watch(themeModeProvider),
       routerConfig: ref.watch(routerProvider),
+      builder: (context, child) =>
+          AppStringsScope(strings: ref.watch(stringsProvider), child: child ?? const SizedBox.shrink()),
     );
   }
 }
@@ -92,7 +97,12 @@ class LoginPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
+    final s = context.s;
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        actions: const [LanguageButton(), SizedBox(width: 8)],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
@@ -104,17 +114,24 @@ class LoginPage extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Text('Terraformation', style: Theme.of(context).textTheme.headlineMedium),
                 const SizedBox(height: 4),
-                const Text('Visor de Terraform states en S3', textAlign: TextAlign.center),
+                Text(s.appSubtitle, textAlign: TextAlign.center),
                 const SizedBox(height: 24),
                 if (auth.error != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(auth.error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                    child: Text(
+                      switch (auth.errorKind) {
+                        'invalid_response' => s.authInvalidResponse,
+                        'token_rejected' => s.authTokenRejected(auth.errorDetail ?? 0),
+                        _ => auth.error!,
+                      },
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    ),
                   ),
                 FilledButton.icon(
                   onPressed: auth.busy ? null : () => ref.read(authProvider.notifier).login(),
                   icon: const Icon(Icons.login),
-                  label: const Text('Iniciar sesión'),
+                  label: Text(s.signIn),
                 ),
               ]),
             ),

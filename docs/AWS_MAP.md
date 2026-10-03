@@ -1,23 +1,25 @@
-# Mapa Terraform → recursos AWS
+# Terraform → AWS resources map
 
-La app muestra, para **cualquier proyecto** cuyo `tfstate` esté en el bucket, los **recursos AWS** que ese state
-despliega, como lo haría la vista de recursos de CloudFormation. No hay una relación 1 a 1 con los elementos de
-Terraform (un bucket S3 son `aws_s3_bucket` + versionado + política + bloqueo de acceso público…), así que un
-**mapa versionado** indica qué elementos forman cada recurso AWS.
+> 🇪🇸 Versión en español: [docs-es/AWS_MAP.md](../docs-es/AWS_MAP.md)
 
-La vista de elementos de Terraform sigue disponible (pestaña **Terraform**); la pestaña **Recursos AWS** es la principal.
+For **any project** whose `tfstate` is in the bucket, the app shows the **AWS resources** that state deploys, the way
+CloudFormation's resources view would. There is no 1-to-1 relation with Terraform elements (an S3 bucket is
+`aws_s3_bucket` + versioning + policy + public access block…), so a **versioned map** says which elements make up
+each AWS resource.
 
-## Dónde vive
+The Terraform elements view is still available (**Terraform** tab); the **AWS resources** tab is the main one.
 
-| Pieza | Ruta |
+## Where it lives
+
+| Piece | Path |
 |---|---|
-| Mapa (fuente de verdad) | `backend/src/terraformation/aws_map/resource_map.json` |
-| Cargador (nunca lanza) | `backend/src/terraformation/aws_map/loader.py` |
-| Resolvedor | `backend/src/terraformation/aws_map/resolver.py` |
-| API | `GET /api/projects/{project}/aws-resources` y `GET /api/aws-map/coverage` |
-| Verificación y propuestas | `scripts/check_aws_map.py` (`make aws-map-check`) |
+| Map (source of truth) | `backend/src/terraformation/aws_map/resource_map.json` |
+| Loader (never raises) | `backend/src/terraformation/aws_map/loader.py` |
+| Resolver | `backend/src/terraformation/aws_map/resolver.py` |
+| API | `GET /api/projects/{project}/aws-resources` and `GET /api/aws-map/coverage` |
+| Verification and proposals | `scripts/check_aws_map.py` (`make aws-map-check`) |
 
-## Formato del mapa
+## Map format
 
 ```json
 {
@@ -37,57 +39,57 @@ La vista de elementos de Terraform sigue disponible (pestaña **Terraform**); la
 }
 ```
 
-* **primary**: define un recurso AWS. `cfn_type` es el tipo de CloudFormation; `identity` es la lista de atributos
-  candidatos (se usa el primero con valor) que lo identifica; `name` es solo para mostrar.
-* **child**: pertenece a otro recurso. `parent.child_attr` es el atributo del hijo que apunta al padre y
-  `parent.parent_attr` los atributos del padre con los que se compara **por valor exacto**. Un hijo puede colgar de otro
-  hijo (cadena, hasta 5 niveles; p. ej. regla de listener → listener → balanceador). `cfn_type` en un hijo es solo la
-  etiqueta del tipo de CloudFormation equivalente.
-* **status**: `verified` (revisada y comprobada con `check_aws_map.py`) o `provisional` (se muestra con un aviso).
-* Varios elementos de Terraform con la misma identidad forman **un solo** recurso AWS.
+* **primary**: defines an AWS resource. `cfn_type` is the CloudFormation type; `identity` is the list of candidate
+  attributes (the first with a value is used) that identifies it; `name` is for display only.
+* **child**: belongs to another resource. `parent.child_attr` is the child's attribute that points to the parent and
+  `parent.parent_attr` the parent's attributes it is compared with **by exact value**. A child can hang from another
+  child (chain, up to 5 levels; e.g. listener rule → listener → load balancer). `cfn_type` on a child is just the
+  label of the equivalent CloudFormation type.
+* **status**: `verified` (reviewed and checked with `check_aws_map.py`) or `provisional` (shown with a notice).
+* Several Terraform elements with the same identity form **one** AWS resource.
 
-## Falla segura
+## Fail safe
 
-El mapa puede estar desactualizado u omitir tipos. La regla es **no adivinar jamás** (ni por nombre ni por parecido):
-todo recurso gestionado queda en exactamente un lugar y lo dudoso se muestra, no se oculta.
+The map may be outdated or omit types. The rule is to **never guess** (neither by name nor by similarity): every
+managed resource ends up in exactly one place and anything doubtful is shown, not hidden.
 
-| Situación | Resultado en la UI/API |
+| Situation | Result in the UI/API |
 |---|---|
-| El tipo no está en el mapa | **Sin mapear** · `no_rule` |
-| Proveedor distinto de AWS | **Sin mapear** · `non_aws_provider` |
-| El identificador falta, está vacío o enmascarado | **Sin mapear** · `missing_identity` |
-| Un hijo no tiene valor de enlace | **Sin mapear** · `missing_parent_ref` |
-| El padre no está en el state | **Sin mapear** · `orphan_child` |
-| El padre coincide con varios recursos | **Sin mapear** · `ambiguous_parent` |
-| Una regla del mapa es inválida | **Sin mapear** · `invalid_map_entry` (el resto del mapa sigue funcionando; estado `degraded`) |
-| El archivo del mapa falta, está roto o su versión no se soporta | **Todo** sin mapear · `map_unavailable` (estado `unavailable`, aviso rojo) |
-| `reviewed_at` más antiguo que `stale_after_days` o inválido | Aviso de mapa desactualizado (se sigue usando) |
+| The type is not in the map | **Unmapped** · `no_rule` |
+| Provider other than AWS | **Unmapped** · `non_aws_provider` |
+| The identifier is missing, empty or masked | **Unmapped** · `missing_identity` |
+| A child has no link value | **Unmapped** · `missing_parent_ref` |
+| The parent is not in the state | **Unmapped** · `orphan_child` |
+| The parent matches several resources | **Unmapped** · `ambiguous_parent` |
+| A map rule is invalid | **Unmapped** · `invalid_map_entry` (the rest of the map keeps working; `degraded` state) |
+| The map file is missing, broken or its version is unsupported | **Everything** unmapped · `map_unavailable` (`unavailable` state, red notice) |
+| `reviewed_at` older than `stale_after_days` or invalid | Outdated map notice (it keeps being used) |
 
-Siempre se listan aparte las utilidades (`random_*`, `time_*`, `null_*`, `tls_*`…) y los *data sources*: no crean
-recursos AWS, pero tampoco se esconden. La API nunca devuelve error por un mapa roto.
+Utilities (`random_*`, `time_*`, `null_*`, `tls_*`…) and *data sources* are always listed separately: they do not
+create AWS resources, but they are not hidden either. The API never returns an error because of a broken map.
 
-> El `id` de las claves de acceso IAM lo enmascara el parser (parece una credencial); por eso `aws_iam_access_key` se
-> modela como hijo del usuario IAM y, si el usuario no está en el state, queda visible como `orphan_child`.
+> The `id` of IAM access keys is masked by the parser (it looks like a credential); that is why `aws_iam_access_key`
+> is modeled as a child of the IAM user and, if the user is not in the state, stays visible as `orphan_child`.
 
-## Mantener el mapa
+## Maintaining the map
 
-1. **Ver qué falta.** `GET /api/aws-map/coverage` revisa los states vigentes de todos los proyectos y lista los
-   tipos sin mapear (con número de instancias, states afectados y motivo). Guárdalo en un archivo.
-2. **Proponer entradas.** `python scripts/check_aws_map.py --coverage cobertura.json --propose` sugiere, para los
-   tipos `aws_*` que coinciden **exactamente** con un tipo de CloudFormation, una entrada `provisional`. Las propuestas
-   **no se aplican solas**: revisa la identidad (¿es `arn` o `id`?) y si es un recurso hijo, y cópialas al mapa.
-3. **Verificar.** `make aws-map-check` valida la estructura, que los padres existan y que no haya ciclos, y que cada
-   `cfn_type` exista en CloudFormation (usa `cfn-lint`). Con `--provider-schema esquema.json` o `--download-schema`
-   (ejecuta `terraform providers schema -json`; descarga el proveedor AWS, ~700 MB) comprueba además que cada tipo y
-   atributo exista en el proveedor de Terraform.
-4. **Actualizar `reviewed_at`** al revisar el mapa (apaga el aviso de desactualizado).
-5. Añade un test si la entrada tiene una regla de enlace poco habitual (`backend/tests/test_aws_map.py`).
+1. **See what is missing.** `GET /api/aws-map/coverage` checks the current states of all projects and lists the
+   unmapped types (with instance count, affected states and reason). Save it to a file.
+2. **Propose entries.** `python scripts/check_aws_map.py --coverage coverage.json --propose` suggests a `provisional`
+   entry for the `aws_*` types that match a CloudFormation type **exactly**. Proposals are
+   **not applied automatically**: review the identity (is it `arn` or `id`?) and whether it is a child resource, and copy them to the map.
+3. **Verify.** `make aws-map-check` validates the structure, that parents exist and that there are no cycles, and that each
+   `cfn_type` exists in CloudFormation (uses `cfn-lint`). With `--provider-schema schema.json` or `--download-schema`
+   (runs `terraform providers schema -json`; downloads the AWS provider, ~700 MB) it also checks that each type and
+   attribute exists in the Terraform provider.
+4. **Update `reviewed_at`** when you review the map (turns off the outdated notice).
+5. Add a test if the entry has an unusual link rule (`backend/tests/test_aws_map.py`).
 
-El CI ejecuta la verificación estructural y de tipos de CloudFormation en cada cambio. La comprobación contra el proveedor de
-Terraform es manual (pesada); se recomienda correrla al revisar el mapa y al subir de versión mayor del proveedor.
+CI runs the structural and CloudFormation-type verification on every change. The check against the Terraform provider
+is manual (heavy); run it when reviewing the map and on provider major version bumps.
 
-## Lo que el mapa no hace
+## What the map does not do
 
-* No consulta AWS: deriva todo de lo que ya está en el `tfstate` ingerido (sin permisos nuevos ni costo).
-* No detecta *drift* ni recursos creados fuera de Terraform.
-* No resuelve nombres de recursos hijos a recursos de otro state (cada state se resuelve por separado).
+* It does not query AWS: everything is derived from what is already in the ingested `tfstate` (no new permissions or cost).
+* It does not detect *drift* or resources created outside Terraform.
+* It does not resolve child resource names to resources of another state (each state is resolved separately).

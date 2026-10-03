@@ -1,11 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:terraformation_web/core/api/models.dart';
 import 'package:terraformation_web/core/state_ref.dart';
+import 'package:terraformation_web/l10n/app_strings.dart';
 import 'package:terraformation_web/features/graph/layout.dart';
 import 'package:terraformation_web/shared/format.dart';
 
 void main() {
-  test('Project parsea lock y valores por defecto', () {
+  test('Project parses the lock and default values', () {
     final p = Project.fromJson({
       'project': 'a',
       'workspace': 'dev',
@@ -21,7 +22,7 @@ void main() {
     expect(none.lock.noneDetected, isTrue);
   });
 
-  test('Project con ruta anidada genera etiqueta y URL del state', () {
+  test('Project with a nested path builds the state label and URL', () {
     final p = Project.fromJson({
       'project': 'a',
       'workspace': 'dev',
@@ -37,7 +38,7 @@ void main() {
     expect(stateLocation(root.stateRef), '/projects/b?workspace=default');
   });
 
-  test('AwsResources parsea grupos, sin mapear y estado del mapa', () {
+  test('AwsResources parses groups, unmapped items and the map status', () {
     final r = AwsResources.fromJson({
       'map': {'state': 'degraded', 'stale': true, 'stale_after_days': 180, 'entries': 157, 'issues': ['x']},
       'coverage': {
@@ -76,7 +77,7 @@ void main() {
     expect(AwsMapStatus.fromJson({'state': 'unavailable', 'stale': false, 'stale_after_days': 1, 'entries': 0}).unavailable, isTrue);
   });
 
-  test('StateDiff parsea alias from/to y cambios', () {
+  test('StateDiff parses the from/to aliases and changes', () {
     final d = StateDiff.fromJson({
       'from': {'version_id': 'v1', 'serial': 1},
       'to': {'version_id': 'v2', 'serial': 2},
@@ -106,7 +107,7 @@ void main() {
     expect(d.modified.single.sensitiveChanged, isTrue);
   });
 
-  test('layout del grafo es determinista y agrupa en el área', () {
+  test('graph layout is deterministic and groups within the area', () {
     final nodes = [
       for (var i = 0; i < 12; i++) GraphNode(id: 'n$i', kind: 'resource', module: i < 6 ? 'root' : 'module.a'),
     ];
@@ -123,7 +124,7 @@ void main() {
     expect(linked, lessThan(far));
   });
 
-  test('moduleGraph agrega nodos y aristas por módulo', () {
+  test('moduleGraph aggregates nodes and edges per module', () {
     final g = DependencyGraph(
       nodes: const [
         GraphNode(id: 'a.x', kind: 'resource', module: 'root'),
@@ -137,10 +138,14 @@ void main() {
     expect(edges.single.target, 'module.m');
   });
 
-  test('formatos de tiempo', () {
+  test('time formats', () {
     final now = DateTime.utc(2026, 1, 1, 12);
-    expect(relativeTime('2026-01-01T11:55:00Z', now: now), 'hace 5 min');
-    expect(relativeTime('2025-12-30T12:00:00Z', now: now), 'hace 2 d');
+    const en = AppStrings(AppLang.en);
+    const es = AppStrings(AppLang.es);
+    expect(relativeTime(en, '2026-01-01T11:55:00Z', now: now), '5 min ago');
+    expect(relativeTime(en, '2025-12-30T12:00:00Z', now: now), '2 d ago');
+    expect(relativeTime(es, '2026-01-01T11:55:00Z', now: now), 'hace 5 min');
+    expect(relativeTime(es, '2025-12-30T12:00:00Z', now: now), 'hace 2 d');
     expect(formatDuration(3700), '1 h 1 min');
     expect(formatDuration(null), '—');
   });

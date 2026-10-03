@@ -1,4 +1,4 @@
-"""Configuración por variables de entorno."""
+"""Configuration from environment variables."""
 
 from __future__ import annotations
 

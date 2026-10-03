@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth.dart';
 import '../../core/providers.dart';
+import '../../l10n/language_button.dart';
+import '../../l10n/app_strings.dart';
 
 class ThemeModeNotifier extends Notifier<ThemeMode> {
   @override
@@ -15,11 +17,13 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
 final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
 
 const _destinations = [
-  (path: '/', label: 'Dashboard', icon: Icons.space_dashboard_outlined),
-  (path: '/projects', label: 'Proyectos', icon: Icons.folder_copy_outlined),
-  (path: '/search', label: 'Búsqueda', icon: Icons.manage_search),
-  (path: '/locks', label: 'Locks', icon: Icons.lock_clock),
+  (path: '/', icon: Icons.space_dashboard_outlined),
+  (path: '/projects', icon: Icons.folder_copy_outlined),
+  (path: '/search', icon: Icons.manage_search),
+  (path: '/locks', icon: Icons.lock_clock),
 ];
+
+List<String> _labels(AppStrings s) => [s.navDashboard, s.navProjects, s.navSearch, s.navLocks];
 
 class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.location, required this.child});
@@ -39,6 +43,8 @@ class AppShell extends ConsumerWidget {
     final locks = ref.watch(activeLocksProvider).asData?.value;
     final alerts = locks?.items.where((l) => l.alert).length ?? 0;
     final brightness = Theme.of(context).brightness;
+    final s = context.s;
+    final labels = _labels(s);
 
     final actions = <Widget>[
       if (alerts > 0)
@@ -47,19 +53,20 @@ class AppShell extends ConsumerWidget {
           child: Badge.count(
             count: alerts,
             child: IconButton(
-              tooltip: 'Locks con alerta',
+              tooltip: s.tipAlertLocks,
               icon: const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
               onPressed: () => context.go('/locks'),
             ),
           ),
         ),
+      const LanguageButton(),
       IconButton(
-        tooltip: 'Cambiar tema',
+        tooltip: s.tipChangeTheme,
         icon: Icon(brightness == Brightness.dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
         onPressed: () => ref.read(themeModeProvider.notifier).toggle(brightness),
       ),
       IconButton(
-        tooltip: 'Actualizar',
+        tooltip: s.tipRefresh,
         icon: const Icon(Icons.refresh),
         onPressed: () {
           ref.invalidate(dashboardProvider);
@@ -68,14 +75,14 @@ class AppShell extends ConsumerWidget {
         },
       ),
       PopupMenuButton<String>(
-        tooltip: auth.email ?? 'Cuenta',
+        tooltip: auth.email ?? s.account,
         icon: const Icon(Icons.account_circle_outlined),
         onSelected: (v) {
           if (v == 'logout') ref.read(authProvider.notifier).logout();
         },
         itemBuilder: (_) => [
-          PopupMenuItem(enabled: false, child: Text(auth.email ?? 'Sesión activa')),
-          const PopupMenuItem(value: 'logout', child: Text('Cerrar sesión')),
+          PopupMenuItem(enabled: false, child: Text(auth.email ?? s.sessionActive)),
+          PopupMenuItem(value: 'logout', child: Text(s.signOut)),
         ],
       ),
       const SizedBox(width: 8),
@@ -96,8 +103,8 @@ class AppShell extends ConsumerWidget {
             labelType: NavigationRailLabelType.all,
             onDestinationSelected: (i) => context.go(_destinations[i].path),
             destinations: [
-              for (final d in _destinations)
-                NavigationRailDestination(icon: Icon(d.icon), label: Text(d.label)),
+              for (final (i, d) in _destinations.indexed)
+                NavigationRailDestination(icon: Icon(d.icon), label: Text(labels[i])),
             ],
           ),
           const VerticalDivider(width: 1),
@@ -112,7 +119,7 @@ class AppShell extends ConsumerWidget {
         selectedIndex: _index,
         onDestinationSelected: (i) => context.go(_destinations[i].path),
         destinations: [
-          for (final d in _destinations) NavigationDestination(icon: Icon(d.icon), label: d.label),
+          for (final (i, d) in _destinations.indexed) NavigationDestination(icon: Icon(d.icon), label: labels[i]),
         ],
       ),
     );

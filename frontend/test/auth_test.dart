@@ -25,12 +25,12 @@ ProviderContainer make(MemoryBrowser b, http.Client c) => ProviderContainer(over
     ]);
 
 void main() {
-  test('PKCE S256 coincide con el vector de la RFC 7636', () {
+  test('PKCE S256 matches the RFC 7636 test vector', () {
     expect(pkceChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'),
         'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
   });
 
-  test('login redirige a /oauth2/authorize con PKCE y state', () {
+  test('login redirects to /oauth2/authorize with PKCE and state', () {
     final b = MemoryBrowser();
     final c = make(b, MockClient((_) async => http.Response('{}', 200)));
     c.read(authProvider.notifier).login();
@@ -44,7 +44,7 @@ void main() {
     expect(u.queryParameters['state'], b.getSession('tf.state'));
   });
 
-  test('init intercambia el code por tokens y limpia la URL', () async {
+  test('init exchanges the code for tokens and cleans the URL', () async {
     final b = MemoryBrowser(uri: Uri.parse('https://app.example.test/?code=abc&state=xyz'));
     b.setSession('tf.state', 'xyz');
     b.setSession('tf.verifier', 'ver');
@@ -72,7 +72,7 @@ void main() {
     expect(await c.read(authProvider.notifier).accessToken(), 'at');
   });
 
-  test('state distinto invalida el inicio de sesión', () async {
+  test('a different state invalidates the sign-in', () async {
     final b = MemoryBrowser(uri: Uri.parse('https://app.example.test/?code=abc&state=bad'));
     b.setSession('tf.state', 'ok');
     b.setSession('tf.verifier', 'ver');
@@ -82,7 +82,7 @@ void main() {
     expect(c.read(authProvider).error, isNotNull);
   });
 
-  test('sin sesión: no autenticado y sin error', () async {
+  test('no session: unauthenticated and no error', () async {
     final b = MemoryBrowser();
     final c = make(b, MockClient((_) async => http.Response('{}', 200)));
     await c.read(authProvider.notifier).init();
@@ -90,7 +90,7 @@ void main() {
     expect(c.read(authProvider).authenticated, isFalse);
   });
 
-  test('refresh con token vencido renueva', () async {
+  test('refresh with an expired token renews it', () async {
     final b = MemoryBrowser();
     b.setSession('tf.access', 'old');
     b.setSession('tf.refresh', 'rt');

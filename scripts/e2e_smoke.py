@@ -1,8 +1,8 @@
-"""Prueba de humo end-to-end local (sin AWS): FastAPI + moto + build de Flutter en Chromium.
+"""Local end-to-end smoke test (no AWS): FastAPI + moto + Flutter build in Chromium.
 
     python scripts/e2e_smoke.py [--shots DIR]
 
-Requiere `make web-build`, `pip install playwright uvicorn` y Chromium (PLAYWRIGHT_BROWSERS_PATH).
+Requires `make web-build`, `pip install playwright uvicorn` and Chromium (PLAYWRIGHT_BROWSERS_PATH).
 """
 
 from __future__ import annotations
@@ -151,16 +151,16 @@ def main() -> int:
             )
             browser.close()
         server.should_exit = True
-        # Se ignoran avisos de recursos (favicon, fuentes) que no afectan la prueba
+        # Resource warnings (favicon, fonts) that do not affect the test are ignored
         real = [
             e
             for e in errors
             if "favicon" not in e and "Failed to load resource" not in e
         ]
         if real:
-            print("Errores en consola:\n" + "\n".join(real))
+            print("Console errors:\n" + "\n".join(real))
             return 1
-        print("e2e OK", f"(capturas en {shots})" if shots else "")
+        print("e2e OK", f"(screenshots in {shots})" if shots else "")
         return 0
 
 

@@ -1,4 +1,4 @@
-"""Diff entre dos versiones de un mismo state."""
+"""Diff between two versions of the same state."""
 
 from __future__ import annotations
 
@@ -129,7 +129,7 @@ def _diff_outputs(old: ParsedState, new: ParsedState) -> list[OutputChange]:
 
 
 def count_changes(old: ParsedState | None, new: ParsedState) -> tuple[int, int, int]:
-    """(agregados, eliminados, modificados) de ``new`` respecto a ``old`` (sin texto de diff)."""
+    """(added, removed, modified) of ``new`` relative to ``old`` (without diff text)."""
     if old is None:
         return len(new.instances), 0, 0
     o = {i.address: i for i in old.instances}

@@ -1,4 +1,4 @@
-"""API REST (FastAPI). Se ejecuta en Lambda detrás de API Gateway HTTP API vía Mangum."""
+"""REST API (FastAPI). Runs in Lambda behind an API Gateway HTTP API via Mangum."""
 
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ def set_services(svc: Services | None) -> None:
 
 
 def get_services() -> Services:
-    if _services is None:  # pragma: no cover - se configura en el handler
+    if _services is None:  # pragma: no cover - configured in the handler
         raise RuntimeError("servicios no inicializados")
     return _services
 
@@ -78,7 +78,7 @@ Workspace = Annotated[str, Query(description="Workspace de Terraform")]
 StatePath = Annotated[
     str,
     Query(
-        description="Ruta del state dentro del proyecto (incluye el archivo, p. ej. `network/prod.tfstate`)"
+        description="Path of the state inside the project (includes the file, e.g. `network/prod.tfstate`)"
     ),
 ]
 Limit = Annotated[int, Query(ge=1, le=500)]
@@ -126,7 +126,7 @@ def list_projects(
     limit: Limit = 200,
     activity: bool = True,
 ) -> ProjectList:
-    """Proyectos (state = proyecto + workspace) ordenados por última modificación."""
+    """Projects (state = project + workspace) ordered by last modification."""
     items = svc.summaries()
     if q:
         items = [
@@ -181,7 +181,7 @@ def _version_out(item: dict[str, Any], current: str | None) -> VersionOut:
     "/projects/{project}/versions",
     response_model=VersionList,
     tags=["projects"],
-    summary="Versiones de un state",
+    summary="Versions of a state",
 )
 def list_versions(
     project: str,
@@ -196,9 +196,7 @@ def list_versions(
     return VersionList(items=[_version_out(v, current) for v in versions[:limit]])
 
 
-@read.get(
-    "/projects/{project}/timeline", response_model=Timeline, tags=["projects"], summary="Línea de tiempo"
-)
+@read.get("/projects/{project}/timeline", response_model=Timeline, tags=["projects"], summary="Timeline")
 def timeline(
     project: str,
     svc: Svc,
@@ -206,7 +204,7 @@ def timeline(
     path: StatePath = DEFAULT_PATH,
     limit: Limit = 200,
 ) -> Timeline:
-    """Versiones con conteo de cambios y marcas de lock/unlock, más reciente primero."""
+    """Versions with change counts and lock/unlock marks, newest first."""
     ref = _ref(project, workspace, path)
     events: list[TimelineEvent] = []
     for v in plain(svc.store.list_versions(ref)):
@@ -252,12 +250,12 @@ def timeline(
     "/projects/{project}/versions/{version_id}",
     response_model=StateDetail,
     tags=["states"],
-    summary="Detalle de un state en una versión",
+    summary="State detail at a version",
 )
 def get_state(
     project: str, version_id: str, svc: Svc, workspace: Workspace = "default", path: StatePath = DEFAULT_PATH
 ) -> StateDetail:
-    """Se lee de S3 por ``versionId`` y se enmascara en memoria. ``current`` = versión vigente."""
+    """Read from S3 by ``versionId`` and masked in memory. ``current`` = current version."""
     ref = _ref(project, workspace, path)
     item = svc.version_item(ref, version_id)
     state = svc.load_state(item)
@@ -298,7 +296,7 @@ def _diff(svc: Services, ref: StateRef, from_version: str, to_version: str) -> S
     response_model=StateDiff,
     response_model_by_alias=True,
     tags=["states"],
-    summary="Diff entre dos versiones",
+    summary="Diff between two versions",
 )
 def diff(
     project: str,
@@ -319,7 +317,7 @@ def diff(
 )
 def diff_summary(project: str, body: DiffSummaryRequest, svc: Svc) -> DiffSummaryOut:
     if not svc.settings.enable_bedrock or svc.bedrock is None:
-        raise HTTPException(501, "El resumen con Bedrock está desactivado (EnableBedrockSummary=false)")
+        raise HTTPException(501, "The Bedrock summary is disabled (EnableBedrockSummary=false)")
     d = _diff(svc, _ref(project, body.workspace, body.path), body.from_version, body.to_version)
     text = bedrock.summarize_diff(svc.bedrock, svc.settings.bedrock_model_id, d, body.language)
     return DiffSummaryOut(summary=text, model_id=svc.settings.bedrock_model_id)
@@ -392,7 +390,7 @@ def _comp(c: Component) -> AwsComponent:
 
 
 def _resolve_state(svc: Services, ref: StateRef) -> Resolution:
-    """Agrupa los recursos de un state. Si el mapa falla, todo queda "sin mapear" (falla segura)."""
+    """Groups the resources of a state. If the map fails, everything stays "unmapped" (fail safe)."""
     return resolve(plain(svc.store.list_resources(ref)), default_map())
 
 
@@ -400,14 +398,14 @@ def _resolve_state(svc: Services, ref: StateRef) -> Resolution:
     "/projects/{project}/aws-resources",
     response_model=AwsResources,
     tags=["aws-map"],
-    summary="Recursos AWS de un state (mapa Terraform → AWS)",
+    summary="AWS resources of a state (Terraform → AWS map)",
 )
 def aws_resources(
     project: str, svc: Svc, workspace: Workspace = "default", path: StatePath = DEFAULT_PATH
 ) -> AwsResources:
-    """Agrupa los recursos de Terraform en recursos AWS; lo que el mapa no reconoce va en `unmapped`."""
+    """Groups Terraform resources into AWS resources; what the map does not recognize goes in `unmapped`."""
     ref = _ref(project, workspace, path)
-    svc.summary(ref)  # 404 si el state no existe
+    svc.summary(ref)  # 404 if missing
     res = _resolve_state(svc, ref)
     rmap = default_map()
     return AwsResources(
@@ -439,10 +437,10 @@ def aws_resources(
     "/aws-map/coverage",
     response_model=AwsMapCoverage,
     tags=["aws-map"],
-    summary="Tipos del bucket que el mapa aún no cubre",
+    summary="Bucket types the map does not cover yet",
 )
 def aws_map_coverage(svc: Svc, max_states: Annotated[int, Query(ge=1, le=1000)] = 300) -> AwsMapCoverage:
-    """Revisa los states vigentes de todos los proyectos y lista los tipos sin mapear."""
+    """Checks the current states of every project and lists the unmapped types."""
     summaries = [s for s in svc.summaries() if not s.get("deleted")]
     chosen = summaries[:max_states]
     rmap = default_map()
@@ -506,12 +504,12 @@ def _active_locks(svc: Services) -> list[ActiveLock]:
     return out
 
 
-@read.get("/locks", response_model=ActiveLocks, tags=["locks"], summary="Proyectos bloqueados ahora")
+@read.get("/locks", response_model=ActiveLocks, tags=["locks"], summary="Currently locked projects")
 def active_locks(svc: Svc) -> ActiveLocks:
     return ActiveLocks(threshold_minutes=svc.settings.lock_alert_minutes, items=_active_locks(svc))
 
 
-@read.get("/dashboard", response_model=Dashboard, tags=["dashboard"], summary="Métricas agregadas")
+@read.get("/dashboard", response_model=Dashboard, tags=["dashboard"], summary="Aggregated metrics")
 def dashboard(svc: Svc, days: Annotated[int, Query(ge=1, le=90)] = 30) -> Dashboard:
     summaries = [s for s in svc.summaries() if not s.get("deleted")]
     by_type: Counter[str] = Counter()
@@ -562,7 +560,7 @@ def dashboard(svc: Svc, days: Annotated[int, Query(ge=1, le=90)] = 30) -> Dashbo
     )
 
 
-@read.get("/facets", response_model=Facets, tags=["search"], summary="Valores para filtros de búsqueda")
+@read.get("/facets", response_model=Facets, tags=["search"], summary="Values for search filters")
 def facets(svc: Svc) -> Facets:
     summaries = [s for s in svc.summaries() if not s.get("deleted")]
     types: Counter[str] = Counter()
@@ -584,26 +582,24 @@ def facets(svc: Svc) -> Facets:
 MAX_SCAN_PAGES = 20
 
 
-@read.get("/search", response_model=SearchResult, tags=["search"], summary="Búsqueda de recursos")
+@read.get("/search", response_model=SearchResult, tags=["search"], summary="Resource search")
 def search(
     svc: Svc,
     type: Annotated[str | None, Query(description="Tipo exacto, p. ej. aws_s3_bucket")] = None,
-    name: Annotated[str | None, Query(description="Nombre exacto del recurso")] = None,
-    module: Annotated[str | None, Query(description="Módulo (contiene); `root` = raíz")] = None,
+    name: Annotated[str | None, Query(description="Exact resource name")] = None,
+    module: Annotated[str | None, Query(description="Module (contains); `root` = root")] = None,
     project: str | None = None,
     workspace: str | None = None,
-    path: Annotated[str | None, Query(description="Ruta exacta del state dentro del proyecto")] = None,
-    attribute_key: Annotated[
-        str | None, Query(description="Clave de atributo (exacta o prefijo `a.`)")
-    ] = None,
+    path: Annotated[str | None, Query(description="Exact path of the state inside the project")] = None,
+    attribute_key: Annotated[str | None, Query(description="Attribute key (exact or prefix `a.`)")] = None,
     attribute_value: Annotated[str | None, Query(description="Valor de atributo (contiene)")] = None,
     limit: Limit = 100,
     cursor: str | None = None,
 ) -> SearchResult:
-    """Busca sobre la versión vigente de cada state.
+    """Searches the current version of each state.
 
-    * `type` usa GSI1, `name` usa GSI2, `project` consulta por clave; solo con atributos se hace
-      un Scan filtrado y acotado.
+    * `type` uses GSI1, `name` uses GSI2, `project` queries by key; only with attributes is a
+      filtered, bounded Scan done.
     """
     start = decode_cursor(cursor)
     kwargs: dict[str, Any] = {}
@@ -770,7 +766,7 @@ def _plan_summary(item: dict[str, Any]) -> PlanSummary:
     "/plans", response_model=PlanSummary, status_code=201, tags=["plans"], summary="Enviar un plan"
 )
 def submit_plan(payload: PlanPayload, svc: Svc) -> PlanSummary:
-    """Mismo payload que terraboard. Se guarda un resumen de cambios, no el JSON crudo."""
+    """Same payload as terraboard. A change summary is stored, not the raw JSON."""
     counts, resources, outputs, constraints, truncated = summarize_plan(payload.plan_json)
     created = now_iso()
     plan_id = f"{created}_{uuid.uuid4().hex[:12]}"
@@ -795,7 +791,7 @@ def submit_plan(payload: PlanPayload, svc: Svc) -> PlanSummary:
     return _plan_summary(item)
 
 
-@plans_read.get("/plans", response_model=PlanList, tags=["plans"], summary="Planes de un lineage o proyecto")
+@plans_read.get("/plans", response_model=PlanList, tags=["plans"], summary="Plans of a lineage or project")
 def list_plans(
     svc: Svc,
     lineage: str | None = None,
@@ -838,7 +834,7 @@ def create_app(mode: AppMode = "main") -> FastAPI:
     app = FastAPI(
         title="Terraformation API",
         version="0.1.0",
-        description="API de solo lectura para visualizar Terraform states almacenados en S3.",
+        description="Read-only API to visualize Terraform states stored in S3.",
         docs_url=None,
         redoc_url=None,
         openapi_url="/api/openapi.json" if mode == "all" else None,

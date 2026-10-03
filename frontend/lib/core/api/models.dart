@@ -1,6 +1,6 @@
-// Modelos tipados alineados con docs/openapi.yaml.
-// Cada clase indica su esquema con `// openapi: <Schema>`; scripts/check_dart_models.py
-// verifica en CI que los campos coincidan con el contrato.
+// Typed models aligned with docs/openapi.yaml.
+// Each class names its schema with `// openapi: <Schema>`; scripts/check_dart_models.py
+// checks in CI that the fields match the contract.
 
 import '../state_ref.dart';
 
@@ -148,7 +148,7 @@ class Project {
 
   StateRef get stateRef => (project: project, workspace: workspace, path: path);
 
-  /// Nombre corto del state dentro del proyecto (`terraform.tfstate` se omite).
+  /// Short name of the state inside the project (`terraform.tfstate` is omitted).
   String get statePath => path == 'terraform.tfstate' ? '' : path;
 
   String get label {
@@ -845,7 +845,7 @@ class DependencyGraph {
       );
 }
 
-// ---- Recursos AWS (mapa Terraform -> AWS) ------------------------------------------------
+// ---- AWS resources (Terraform -> AWS map) ------------------------------------------------
 // openapi: AwsMapStatus
 class AwsMapStatus {
   const AwsMapStatus({

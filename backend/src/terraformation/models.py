@@ -1,4 +1,4 @@
-"""Modelos Pydantic del dominio (state parseado, resumen, diff, grafo, locks)."""
+"""Pydantic domain models (parsed state, summary, diff, graph, locks)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ class Output(BaseModel):
 
 
 class Instance(BaseModel):
-    """Una instancia de recurso (``count``/``for_each`` generan varias)."""
+    """A resource instance (``count``/``for_each`` produce several)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -31,7 +31,7 @@ class Instance(BaseModel):
     deposed: str | None = None
     attributes: dict[str, str] = Field(default_factory=dict)
     dependencies: list[str] = Field(default_factory=list)
-    # Solo en memoria: detecta cambios en valores enmascarados. Nunca se persiste.
+    # In memory only: detects changes in masked values. Never persisted.
     raw_digest: str = Field(default="", exclude=True, repr=False)
 
     @property
@@ -140,7 +140,7 @@ class Graph(BaseModel):
 
 
 class LockInfo(BaseModel):
-    """JSON del ``.tflock`` nativo de S3 (campos tal como los escribe Terraform)."""
+    """JSON of the native S3 ``.tflock`` (fields as Terraform writes them)."""
 
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 

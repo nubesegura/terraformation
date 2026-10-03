@@ -37,7 +37,7 @@ def test_pattern_masking_and_index_keys(fixture_bytes):
     s = parse_state(fixture_bytes("tf-1.5.7-serial8.tfstate"))
     key = next(i for i in s.instances if i.type == "aws_iam_access_key")
     assert key.attributes["secret"] == MASK
-    assert key.attributes["id"] == MASK  # patrón AKIA...
+    assert key.attributes["id"] == MASK  # AKIA... pattern
     subs = sorted(i.address for i in s.instances if i.type == "aws_subnet")
     assert subs == ['module.net.aws_subnet.s["a"]', 'module.net.aws_subnet.s["b"]']
     assert "wJalr" not in s.model_dump_json()

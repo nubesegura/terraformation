@@ -28,7 +28,7 @@ def populate(aws, fixture_bytes):
     put(aws, "proj-a/terraform.tfstate.tflock", lock.encode())
     aws["s3"].delete_object(Bucket=BUCKET, Key="proj-a/terraform.tfstate.tflock")
     put(aws, "proj-b/terraform.tfstate.tflock", lock.encode())
-    # state con delete marker al final
+    # state with a delete marker at the end
     put(aws, "proj-d/terraform.tfstate", fixture_bytes("tf-0.12.31.tfstate"))
     aws["s3"].delete_object(Bucket=BUCKET, Key="proj-d/terraform.tfstate")
 
@@ -50,13 +50,13 @@ def test_backfill_rebuilds_everything(aws, ctx, fixture_bytes, new_ctx):
     assert ctx.store.get_summary(StateRef("proj-a", "dev"))["terraform_version"] == "0.12.31"
     assert ctx.store.get_summary(StateRef("proj-b", "default"))["terraform_version"] == "1.9.8"
     assert plain(ctx.store.get_summary(StateRef("proj-b", "default")))["version_count"] == 2
-    # versión no soportada: se registra el error y no hay resumen vigente
+    # unsupported version: the error is recorded and there is no current summary
     c = StateRef("proj-c", "default")
     assert versions(aws, c)[0]["parse_error"]
     # delete marker final → state eliminado
     d = ctx.store.get_summary(StateRef("proj-d", "default"))
     assert d["deleted"] is True
-    # locks: historial y estados; ningún .tflock aparece como versión de state
+    # locks: history and states; no .tflock shows up as a state version
     assert ctx.store.get_summary(a)["lock_state"] == "released"
     assert ctx.store.get_summary(StateRef("proj-b", "default"))["lock_state"] == "locked"
     for item in aws["table"].scan()["Items"]:
@@ -80,7 +80,7 @@ def test_backfill_resumes_with_cursor(aws, ctx, fixture_bytes, new_ctx):
     populate(aws, fixture_bytes)
     cursor, loops = "", 0
     while True:
-        # deadline ya vencido tras el primer key: procesa un key por tramo
+        # deadline already expired after the first key: processes one key per slice
         import time
 
         r = sync_bucket(new_ctx(), cursor=cursor, deadline=time.monotonic() - 1)

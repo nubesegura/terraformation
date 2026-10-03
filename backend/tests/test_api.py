@@ -104,12 +104,12 @@ def test_graph_endpoint(client):
 
 
 def test_locks_states_and_alert(client, aws, ctx, fixture_json):
-    lock(aws, ctx, fixture_json)  # Created 10:00, ahora 10:10 → sin alerta
+    lock(aws, ctx, fixture_json)  # Created 10:00, now 10:10 → no alert
     r = client.get("/api/locks").json()
     assert r["threshold_minutes"] == 30 and len(r["items"]) == 1
     assert r["items"][0]["who"] == "ana@laptop" and r["items"][0]["alert"] is False
     assert client.get("/api/projects/proj-a").json()["lock"]["status"] == "locked"
-    # 31+ minutos después → alerta
+    # 31+ minutes later → alert
     client.app  # noqa: B018
     from terraformation.api.app import get_services
 
@@ -156,7 +156,7 @@ def test_search_variants(client):
     scan = client.get(
         "/api/search", params={"attribute_key": "cidr_block", "attribute_value": "10.0.2"}
     ).json()["items"]
-    assert [h["address"] for h in scan] == []  # el subnet b ya no está en la versión vigente
+    assert [h["address"] for h in scan] == []  # subnet b is no longer in the current version
     scan = client.get(
         "/api/search", params={"attribute_key": "cidr_block", "attribute_value": "10.0.1"}
     ).json()["items"]
@@ -173,11 +173,11 @@ def test_bedrock_disabled_and_enabled(client, svc, versions):
     r = client.post("/api/projects/proj-a/diff/summary", json=body)
     assert r.status_code == 501
     fake = MagicMock()
-    fake.converse.return_value = {"output": {"message": {"content": [{"text": "Se agregó un SNS topic."}]}}}
+    fake.converse.return_value = {"output": {"message": {"content": [{"text": "An SNS topic was added."}]}}}
     svc.bedrock = fake
     svc.settings = svc.settings.model_copy(update={"enable_bedrock": True, "bedrock_model_id": "model-x"})
     r = client.post("/api/projects/proj-a/diff/summary", json=body).json()
-    assert r["summary"].startswith("Se agregó") and r["model_id"] == "model-x"
+    assert r["summary"].startswith("An SNS") and r["model_id"] == "model-x"
     prompt = fake.converse.call_args.kwargs["messages"][0]["content"][0]["text"]
     assert "aws_sns_topic.alerts" in prompt and "zzzz" not in prompt and "wJalr" not in prompt
 
@@ -269,7 +269,7 @@ def test_openapi_contract_valid_and_in_sync():
     validate(spec)
     committed = Path(__file__).resolve().parents[2] / "docs" / "openapi.yaml"
     assert yaml.safe_load(committed.read_text(encoding="utf-8")) == json.loads(json.dumps(spec)), (
-        "ejecuta `make openapi`"
+        "run `make openapi`"
     )
     assert "/api/plans" in spec["paths"] and "/api/projects/{project}/diff" in spec["paths"]
 
@@ -288,7 +288,7 @@ def test_nested_states_are_listed_and_addressable_by_path(aws, ctx, svc, client,
     }
     r = client.get("/api/projects/proj-n", params={"path": "apps/web/prod.tfstate"})
     assert r.status_code == 200 and r.json()["path"] == "apps/web/prod.tfstate"
-    assert client.get("/api/projects/proj-n").status_code == 404  # no hay terraform.tfstate en la raíz
+    assert client.get("/api/projects/proj-n").status_code == 404  # there is no terraform.tfstate at the root
     v = client.get("/api/projects/proj-n/versions/current", params={"path": "network/terraform.tfstate"})
     assert v.json()["info"]["s3_key"] == "proj-n/network/terraform.tfstate"
     hits = client.get("/api/search", params={"project": "proj-n", "path": "apps/web/prod.tfstate"}).json()
@@ -299,7 +299,7 @@ def test_nested_states_are_listed_and_addressable_by_path(aws, ctx, svc, client,
 
 def test_aws_resources_groups_terraform_into_aws_resources(client):
     r = client.get("/api/projects/proj-a/aws-resources").json()
-    # la clave de acceso IAM llega enmascarada y su usuario no está en el state: queda visible como huérfana
+    # the IAM access key arrives masked and its user is not in the state: it stays visible as an orphan
     assert r["map"]["state"] == "ok" and r["coverage"]["percent"] == 80.0  # 4 de 5
     kinds = sorted((x["cfn_type"], x["name"]) for x in r["resources"])
     assert ("AWS::S3::Bucket", "my-bucket-anon") in kinds
@@ -313,9 +313,11 @@ def test_aws_resources_groups_terraform_into_aws_resources(client):
 def test_aws_resources_fail_safe_when_map_is_broken(client, monkeypatch, tmp_path):
     from terraformation.aws_map.loader import load_map
 
-    monkeypatch.setattr("terraformation.api.app.default_map", lambda: load_map(tmp_path / "no-existe.json"))
+    monkeypatch.setattr(
+        "terraformation.api.app.default_map", lambda: load_map(tmp_path / "does-not-exist.json")
+    )
     r = client.get("/api/projects/proj-a/aws-resources")
-    assert r.status_code == 200  # un mapa roto nunca rompe la vista
+    assert r.status_code == 200  # a broken map never breaks the view
     body = r.json()
     assert body["map"]["state"] == "unavailable" and body["resources"] == []
     assert {u["reason"] for u in body["unmapped"]} == {"map_unavailable"}
@@ -328,7 +330,7 @@ def test_aws_resources_unknown_type_is_visible_not_guessed(client, monkeypatch, 
     from terraformation.aws_map.loader import DEFAULT_PATH, load_map
 
     doc = json.loads(DEFAULT_PATH.read_text(encoding="utf-8"))
-    del doc["entries"]["aws_subnet"]  # simula un mapa desactualizado
+    del doc["entries"]["aws_subnet"]  # simulates an outdated map
     p = tmp_path / "old.json"
     p.write_text(json.dumps(doc), encoding="utf-8")
     monkeypatch.setattr("terraformation.api.app.default_map", lambda: load_map(p))

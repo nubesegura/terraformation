@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Activación MANUAL de EventBridge en el bucket de states (alternativa al custom resource,
-# ManageBucketNotifications=false). Conserva la configuración de notificaciones existente.
+# MANUAL activation of EventBridge on the states bucket (alternative to the custom resource,
+# ManageBucketNotifications=false). Preserves the existing notification configuration.
 #
 #   scripts/enable-eventbridge.sh <bucket> [--apply] [--profile P]
 #
-# Sin --apply solo muestra la configuración que se enviaría (dry-run).
+# Without --apply it only shows the configuration that would be sent (dry-run).
 set -euo pipefail
 
 BUCKET="${1:?uso: $0 <bucket> [--apply] [--profile P]}"
@@ -23,16 +23,16 @@ done
 command -v jq >/dev/null || { echo "se requiere jq" >&2; exit 1; }
 
 CURRENT="$(aws s3api get-bucket-notification-configuration --bucket "$BUCKET" "${PROFILE_ARGS[@]}" --output json)"
-echo "Configuración actual:"; echo "$CURRENT" | jq .
+echo "Current configuration:"; echo "$CURRENT" | jq .
 
-# PutBucketNotificationConfiguration REEMPLAZA todo: se conserva lo existente y se agrega EventBridge.
+# PutBucketNotificationConfiguration REPLACES everything: the existing config is kept and EventBridge is added.
 NEW="$(echo "$CURRENT" | jq '. + {EventBridgeConfiguration: {}}')"
-echo "Configuración a aplicar:"; echo "$NEW" | jq .
+echo "Configuration to apply:"; echo "$NEW" | jq .
 
 if [ "$APPLY" -eq 1 ]; then
   aws s3api put-bucket-notification-configuration --bucket "$BUCKET" \
     --notification-configuration "$NEW" "${PROFILE_ARGS[@]}"
   echo "EventBridge habilitado en s3://$BUCKET"
 else
-  echo "(dry-run) añade --apply para aplicar"
+  echo "(dry-run) add --apply to apply"
 fi

@@ -1,7 +1,7 @@
-"""Custom resource de CloudFormation: habilita EventBridge preservando la config existente.
+"""CloudFormation custom resource: enables EventBridge while preserving the existing config.
 
-PutBucketNotificationConfiguration *reemplaza* toda la configuración, por eso se lee la
-actual y se reenvía íntegra agregando únicamente ``EventBridgeConfiguration``.
+PutBucketNotificationConfiguration *replaces* the whole configuration, so the current one
+is read and sent back intact, adding only ``EventBridgeConfiguration``.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ PRESERVED = (
 
 
 def merge_configuration(current: dict[str, Any], enable: bool = True) -> dict[str, Any]:
-    """Devuelve la configuración a enviar: la actual (sin metadatos) con/sin EventBridge."""
+    """Returns the configuration to send: the current one (without metadata) with/without EventBridge."""
     merged: dict[str, Any] = {k: current[k] for k in PRESERVED if current.get(k)}
     if enable:
         merged["EventBridgeConfiguration"] = {}

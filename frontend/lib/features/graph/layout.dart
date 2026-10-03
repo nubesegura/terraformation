@@ -3,17 +3,17 @@ import 'dart:ui';
 
 import '../../core/api/models.dart';
 
-/// Posiciones calculadas (coordenadas de escena) para cada nodo.
+/// Computed positions (scene coordinates) for each node.
 class GraphLayout {
   GraphLayout(this.positions, this.size);
   final Map<String, Offset> positions;
   final Size size;
 }
 
-/// Layout dirigido por fuerzas (Fruchterman–Reingold) determinista.
+/// Deterministic force-directed layout (Fruchterman–Reingold).
 ///
-/// Los nodos arrancan agrupados por módulo, de modo que los módulos tiendan a
-/// verse como cúmulos.
+/// Nodes start grouped by module, so modules tend to
+/// show up as clusters.
 GraphLayout layoutGraph(
   List<GraphNode> nodes,
   List<GraphEdge> edges, {
@@ -75,7 +75,7 @@ GraphLayout layoutGraph(
       disp[b] += pull;
     }
     for (var i = 0; i < n; i++) {
-      // Débil atracción hacia el centro del módulo para conservar los cúmulos.
+      // Weak attraction towards the module center to keep the clusters.
       final c = centers[nodes[i].module]!;
       disp[i] += (c - pos[i]) * 0.05;
       final len = math.max(disp[i].distance, 0.01);
@@ -85,7 +85,7 @@ GraphLayout layoutGraph(
     }
     temp -= cool;
   }
-  // Recorta al cuadro delimitador (con margen para etiquetas) para que el grafo ocupe la escena.
+  // Crops to the bounding box (with a margin for labels) so the graph fills the scene.
   var minX = pos.first.dx, maxX = pos.first.dx, minY = pos.first.dy, maxY = pos.first.dy;
   for (final o in pos) {
     minX = math.min(minX, o.dx);
@@ -101,7 +101,7 @@ GraphLayout layoutGraph(
   );
 }
 
-/// Grafo de módulos: un nodo por módulo y aristas agregadas.
+/// Module graph: one node per module and aggregated edges.
 (List<GraphNode>, List<GraphEdge>) moduleGraph(DependencyGraph g) {
   final mods = <String>{};
   for (final n in g.nodes) {

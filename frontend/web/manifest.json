@@ -5,7 +5,7 @@
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Visor serverless de Terraform states en S3",
+    "description": "Serverless Terraform state viewer for S3",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

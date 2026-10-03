@@ -1,10 +1,10 @@
 name: Deploy
 
-# CI + despliegue a AWS con OIDC (sin claves de larga duración) en un único run por push.
-#  - push a `develop` → CI → entorno `dev`
-#  - push a `main`    → CI → entorno `prod` (proteger el environment con revisores requeridos)
-#  - manual           → ejecútalo sobre `develop` o `main`; el entorno se deduce de la rama
-# El despliegue corre siempre que el CI pase. En `prod`, el environment debe tener revisores requeridos.
+# CI + deployment to AWS with OIDC (no long-lived keys) in a single run per push.
+#  - push to `develop` → CI → `dev` environment
+#  - push to `main`    → CI → `prod` environment (protect the environment with required reviewers)
+#  - manual           → run it on `develop` or `main`; the environment is derived from the branch
+# Deployment runs whenever CI passes. On `prod`, the environment must have required reviewers.
 
 on:
   push:
@@ -15,7 +15,7 @@ permissions:
   id-token: write
   contents: read
 
-# Un despliegue por entorno a la vez (evita dos operaciones simultáneas sobre el mismo stack).
+# One deployment per environment at a time (avoids two simultaneous operations on the same stack).
 concurrency:
   group: deploy-${{ github.ref_name == 'main' && 'prod' || 'dev' }}
   cancel-in-progress: false
@@ -33,19 +33,19 @@ jobs:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
     steps:
       - uses: actions/checkout@v4
-      - name: Verificar configuración del environment
-        # Los valores llegan por env (no interpolados en el script) y se validan antes de usarlos.
+      - name: Verify environment configuration
+        # Values arrive through env (not interpolated into the script) and are validated before use.
         run: |
           for v in AWS_REGION STATE_BUCKET; do
-            [ -n "${!v}" ] || { echo "::error::Falta la variable $v en el environment $ENVIRONMENT"; exit 1; }
+            [ -n "${!v}" ] || { echo "::error::Missing variable $v in environment $ENVIRONMENT"; exit 1; }
           done
-          [ -n "$ROLE_ARN" ] || { echo "::error::Falta el secret ROLE_ARN"; exit 1; }
-          [[ "$AWS_REGION" =~ ^[a-z]{2}(-[a-z]+)+-[0-9]$ ]] || { echo "::error::AWS_REGION no válida"; exit 1; }
-          [[ "$STATE_BUCKET" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]] || { echo "::error::STATE_BUCKET no válido"; exit 1; }
-          [[ -z "$ARTIFACT_BUCKET" || "$ARTIFACT_BUCKET" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]] || { echo "::error::ARTIFACT_BUCKET no válido"; exit 1; }
-          set -f  # sin expansión de comodines al separar EXTRA_PARAMS
+          [ -n "$ROLE_ARN" ] || { echo "::error::Missing the ROLE_ARN secret"; exit 1; }
+          [[ "$AWS_REGION" =~ ^[a-z]{2}(-[a-z]+)+-[0-9]$ ]] || { echo "::error::AWS_REGION is not valid"; exit 1; }
+          [[ "$STATE_BUCKET" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]] || { echo "::error::STATE_BUCKET is not valid"; exit 1; }
+          [[ -z "$ARTIFACT_BUCKET" || "$ARTIFACT_BUCKET" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]] || { echo "::error::ARTIFACT_BUCKET is not valid"; exit 1; }
+          set -f  # no wildcard expansion when splitting EXTRA_PARAMS
           for p in $EXTRA_PARAMS; do
-            [[ "$p" =~ ^[A-Za-z][A-Za-z0-9]*=[A-Za-z0-9._:/@,+-]*$ ]] || { echo "::error::EXTRA_PARAMS contiene un parámetro no válido: $p"; exit 1; }
+            [[ "$p" =~ ^[A-Za-z][A-Za-z0-9]*=[A-Za-z0-9._:/@,+-]*$ ]] || { echo "::error::EXTRA_PARAMS contains an invalid parameter: $p"; exit 1; }
           done
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
@@ -67,7 +67,7 @@ jobs:
           uv venv --python 3.13 .venv
           uv pip install --python .venv/bin/python -e "backend[dev]" aws-sam-cli
       - name: Desplegar infraestructura
-        # EXTRA_PARAMS se deja sin comillas a propósito (varios pares Clave=Valor); ya fue validado arriba.
+        # EXTRA_PARAMS is intentionally left unquoted (several Key=Value pairs); it was already validated above.
         run: |
           make deploy ENV="$ENVIRONMENT" REGION="$AWS_REGION" \
             STATE_BUCKET="$STATE_BUCKET" ARTIFACT_BUCKET="$ARTIFACT_BUCKET" EXTRA_PARAMS="$EXTRA_PARAMS"

@@ -16,7 +16,7 @@ class ApiException implements Exception {
   String toString() => detail;
 }
 
-/// Cliente HTTP tipado de la API (contrato: docs/openapi.yaml).
+/// Typed HTTP client for the API (contract: docs/openapi.yaml).
 class ApiClient {
   ApiClient({required this.baseUrl, required this.client, required this.token, this.onUnauthorized});
 
@@ -86,7 +86,7 @@ class ApiClient {
         query: _q(r, {'from_version': from, 'to_version': to}),
       ));
 
-  Future<DiffSummary> diffSummary(StateRef r, String from, String to) async =>
+  Future<DiffSummary> diffSummary(StateRef r, String from, String to, {String language = 'en'}) async =>
       DiffSummary.fromJson(await _send(
         'POST',
         '/api/projects/${_p(r.project)}/diff/summary',
@@ -95,7 +95,7 @@ class ApiClient {
           'path': r.path,
           'from_version': from,
           'to_version': to,
-          'language': 'es',
+          'language': language,
         },
       ));
 

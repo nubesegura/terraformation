@@ -7,6 +7,7 @@ import '../../core/state_ref.dart';
 import '../../shared/format.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets.dart';
+import '../../l10n/app_strings.dart';
 
 class StateTab extends ConsumerStatefulWidget {
   const StateTab({super.key, required this.stateRef, required this.initialVersion});
@@ -44,12 +45,12 @@ class _StateTabState extends ConsumerState<StateTab> {
               child: DropdownButtonFormField<String>(
                 initialValue: selected,
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Versión del state', isDense: true, border: OutlineInputBorder()),
+                decoration: InputDecoration(labelText: context.s.stateVersionLabel, isDense: true, border: const OutlineInputBorder()),
                 items: [
                   for (final v in readable)
                     DropdownMenuItem(
                       value: v.versionId,
-                      child: Text('#${v.serial} · ${shortDateTime(v.lastModified)} · TF ${v.terraformVersion}${v.isCurrent ? ' · vigente' : ''}',
+                      child: Text('#${v.serial} · ${shortDateTime(v.lastModified)} · TF ${v.terraformVersion}${v.isCurrent ? ' · ${context.s.currentTag}' : ''}',
                           overflow: TextOverflow.ellipsis),
                     ),
                 ],
@@ -86,6 +87,7 @@ class _StateBodyState extends State<_StateBody> {
   @override
   Widget build(BuildContext context) {
     final d = widget.d;
+    final s = context.s;
     final t = Theme.of(context).textTheme;
     final f = filter.toLowerCase();
     final res = d.resources.where((r) {
@@ -99,14 +101,14 @@ class _StateBodyState extends State<_StateBody> {
         Tag('Terraform ${d.info.terraformVersion}', icon: Icons.terminal),
         Tag('serial ${d.info.serial}'),
         Tag('lineage ${shortId(d.info.lineage)}…', icon: Icons.fingerprint),
-        Tag('${d.info.resourceCount} recursos'),
+        Tag(s.resourcesCount(d.info.resourceCount)),
         Tag('s3://${d.info.s3Bucket}/${d.info.s3Key}', icon: Icons.cloud_outlined),
         Tag(shortDateTime(d.info.lastModified), icon: Icons.schedule),
       ]),
       const SizedBox(height: 14),
       if (d.outputs.isNotEmpty)
         SectionCard(
-          title: 'Outputs (${d.outputs.length})',
+          title: s.outputsTitle(d.outputs.length),
           child: Column(children: [
             for (final o in d.outputs)
               ListTile(
@@ -115,15 +117,15 @@ class _StateBodyState extends State<_StateBody> {
                 leading: Icon(o.sensitive ? Icons.visibility_off_outlined : Icons.output, size: 18),
                 title: Text(o.name),
                 subtitle: SelectableText(o.value, maxLines: 3, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
-                trailing: o.sensitive ? const Tag('sensible', color: Palette.modified) : null,
+                trailing: o.sensitive ? Tag(s.sensitiveTag, color: Palette.modified) : null,
               ),
           ]),
         ),
       const SizedBox(height: 12),
       SectionCard(
-        title: 'Módulos',
+        title: s.modulesTitle,
         child: Wrap(spacing: 8, runSpacing: 6, children: [
-          ChoiceChip(label: const Text('Todos'), selected: module == null, onSelected: (_) => setState(() => module = null)),
+          ChoiceChip(label: Text(s.allLabel), selected: module == null, onSelected: (_) => setState(() => module = null)),
           for (final m in d.modules)
             ChoiceChip(
               label: Text('${m.path} (${m.resourceCount})'),
@@ -134,11 +136,11 @@ class _StateBodyState extends State<_StateBody> {
       ),
       const SizedBox(height: 12),
       Row(children: [
-        Expanded(child: Text('Recursos (${res.length})', style: t.titleMedium)),
+        Expanded(child: Text(s.resourcesTitle(res.length), style: t.titleMedium)),
         SizedBox(
           width: 280,
           child: TextField(
-            decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Filtrar por dirección o atributo', isDense: true, border: OutlineInputBorder()),
+            decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: s.filterAddressOrAttr, isDense: true, border: const OutlineInputBorder()),
             onChanged: (v) => setState(() => filter = v),
           ),
         ),
@@ -146,7 +148,7 @@ class _StateBodyState extends State<_StateBody> {
       const SizedBox(height: 8),
       for (final r in res.take(400)) _ResourceTile(r: r),
       if (res.length > 400)
-        Padding(padding: const EdgeInsets.all(12), child: Text('Mostrando 400 de ${res.length}; usa el filtro para acotar.')),
+        Padding(padding: const EdgeInsets.all(12), child: Text(s.showingFirst400(res.length))),
     ]);
   }
 }
@@ -177,7 +179,7 @@ class _ResourceTile extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Wrap(spacing: 6, runSpacing: 4, children: [
-                  const Text('Depende de:'),
+                  Text(context.s.dependsOn),
                   for (final dep in r.dependencies) Tag(dep, icon: Icons.subdirectory_arrow_right),
                 ]),
               ),

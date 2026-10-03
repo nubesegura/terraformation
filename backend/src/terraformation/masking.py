@@ -1,4 +1,4 @@
-"""Enmascarado de secretos: ``sensitive_attributes``, patrones de valores y nombres."""
+"""Secret masking: ``sensitive_attributes``, value patterns and names."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def name_looks_secret(key: str) -> bool:
 
 
 def mask_leaf(key: str, value: str) -> str:
-    """Enmascara un valor escalar ya convertido a texto."""
+    """Masks a scalar value already converted to text."""
     if value == "" or value == MASK:
         return value
     if value_looks_secret(value) or name_looks_secret(key):
@@ -51,7 +51,7 @@ def mask_leaf(key: str, value: str) -> str:
 
 
 def normalize_path(path: list[dict[str, Any]]) -> tuple[str | int, ...]:
-    """Convierte una ruta de ``sensitive_attributes`` en una tupla de pasos."""
+    """Converts a ``sensitive_attributes`` path into a tuple of steps."""
     steps: list[str | int] = []
     for step in path:
         value = step.get("value")
@@ -66,7 +66,7 @@ def normalize_path(path: list[dict[str, Any]]) -> tuple[str | int, ...]:
 
 
 def apply_sensitive_paths(attrs: Any, paths: list[list[dict[str, Any]]]) -> Any:
-    """Copia ``attrs`` reemplazando por ``MASK`` los valores en rutas sensibles."""
+    """Copies ``attrs`` replacing values at sensitive paths with ``MASK``."""
     import copy
 
     out = copy.deepcopy(attrs)

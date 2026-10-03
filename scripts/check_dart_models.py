@@ -1,5 +1,5 @@
-"""Verifica que los modelos Dart (`// openapi: Schema`) usen solo campos del contrato OpenAPI
-y cubran todos los campos requeridos. Uso: `python scripts/check_dart_models.py`."""
+"""Checks that the Dart models (`// openapi: Schema`) use only fields from the OpenAPI contract
+and cover all required fields. Usage: `python scripts/check_dart_models.py`."""
 
 from __future__ import annotations
 
@@ -31,20 +31,20 @@ def check() -> list[str]:
     problems: list[str] = []
     for name, keys in dart_fields().items():
         if name not in schemas:
-            problems.append(f"{name}: no existe en OpenAPI")
+            problems.append(f"{name}: does not exist in OpenAPI")
             continue
         props = set(schemas[name].get("properties", {}))
         required = set(schemas[name].get("required", []))
-        # `allOf` (herencia en ActiveLock) no se usa; las propiedades se aplanan en FastAPI.
+        # `allOf` (inheritance in ActiveLock) is not used; properties are flattened in FastAPI.
         extra = keys - props
         if extra:
             problems.append(
-                f"{name}: campos Dart inexistentes en el contrato: {sorted(extra)}"
+                f"{name}: Dart fields missing from the contract: {sorted(extra)}"
             )
         missing = required - keys
         if missing:
             problems.append(
-                f"{name}: campos requeridos sin leer en Dart: {sorted(missing)}"
+                f"{name}: required fields not read in Dart: {sorted(missing)}"
             )
     return problems
 
@@ -54,6 +54,6 @@ if __name__ == "__main__":
     print(
         "\n".join(issues)
         if issues
-        else f"modelos Dart alineados con OpenAPI ({len(dart_fields())} esquemas)"
+        else f"Dart models aligned with OpenAPI ({len(dart_fields())} schemas)"
     )
     sys.exit(1 if issues else 0)

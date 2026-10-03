@@ -1,4 +1,4 @@
-"""Ejecución común de backfill/reconcile con auto-reinvocación."""
+"""Shared backfill/reconcile execution with self-reinvocation."""
 
 from __future__ import annotations
 

@@ -1,12 +1,12 @@
-## Qué cambia
+## What changes
 
-<!-- Resumen breve del cambio y por qué -->
+<!-- Short summary of the change and why -->
 
-## Tipo de cambio
+## Type of change
 - [ ] feat  - [ ] fix  - [ ] docs  - [ ] refactor  - [ ] infra  - [ ] chore
 
 ## Checklist
-- [ ] `make check` pasa (ruff, mypy, pytest, cfn-lint, checkov, OpenAPI sincronizado)
-- [ ] `make web-analyze web-test` pasa si toca el frontend
-- [ ] Sin credenciales, IDs de cuenta ni nombres reales de buckets
-- [ ] Documentación / `docs/DECISIONS.md` actualizados si cambia una decisión de diseño
+- [ ] `make check` passes (ruff, mypy, pytest, cfn-lint, checkov, OpenAPI in sync)
+- [ ] `make web-analyze web-test` passes if it touches the frontend
+- [ ] No credentials, account IDs or real bucket names
+- [ ] Documentation / `docs/DECISIONS.md` updated if a design decision changes

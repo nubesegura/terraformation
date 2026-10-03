@@ -1,4 +1,4 @@
-"""Parser del formato de state versión 4 (Terraform 0.12 → 1.x y OpenTofu)."""
+"""Parser for the state format version 4 (Terraform 0.12 → 1.x and OpenTofu)."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ _PROVIDER = re.compile(r'provider\[\\?"(?P<src>[^"\\]+)\\?"\]|provider\.(?P<lega
 
 
 class StateParseError(ValueError):
-    """El contenido no es un state v4 válido."""
+    """The content is not a valid v4 state."""
 
 
 def strip_instance_keys(module: str) -> str:
@@ -45,7 +45,7 @@ def _scalar(value: Any) -> str:
 
 
 def flatten(value: Any, prefix: str = "", out: dict[str, str] | None = None) -> dict[str, str]:
-    """Aplana atributos a ``clave.punteada`` omitiendo nulos y aplicando el enmascarado."""
+    """Flattens attributes to ``dotted.key`` skipping nulls and applying masking."""
     out = {} if out is None else out
     if isinstance(value, dict):
         if not value and prefix:
@@ -95,16 +95,16 @@ def _type_str(t: Any) -> str:
 
 
 def parse_state(raw: bytes | str | dict[str, Any]) -> ParsedState:
-    """Parsea y enmascara un state. Lanza :class:`StateParseError` si no es v4."""
+    """Parses and masks a state. Raises :class:`StateParseError` if it is not v4."""
     try:
         data = json.loads(raw) if isinstance(raw, (bytes, str)) else raw
     except json.JSONDecodeError as exc:
-        raise StateParseError(f"JSON inválido: {exc}") from exc
+        raise StateParseError(f"invalid JSON: {exc}") from exc
     if not isinstance(data, dict):
-        raise StateParseError("el state debe ser un objeto JSON")
+        raise StateParseError("the state must be a JSON object")
     version = data.get("version")
     if version != 4:
-        raise StateParseError(f"formato de state no soportado: version={version!r} (solo 4)")
+        raise StateParseError(f"unsupported state format: version={version!r} (only 4)")
 
     outputs = [
         Output(
@@ -181,5 +181,5 @@ def summarize(state: ParsedState) -> StateSummary:
 
 
 def content_hash(inst: Instance) -> str:
-    """Hash de contenido ya enmascarado (seguro de persistir)."""
+    """Hash of already masked content (safe to persist)."""
     return _digest([inst.attributes, inst.dependencies, inst.status, inst.provider])

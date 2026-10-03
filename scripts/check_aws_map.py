@@ -1,16 +1,16 @@
-"""Verifica el mapa Terraform -> recursos AWS y propone entradas para los tipos que le faltan.
+"""Checks the Terraform -> AWS resources map and proposes entries for the types it lacks.
 
-Uso (ver docs/AWS_MAP.md):
+Usage (see docs/AWS_MAP.md):
 
-    python scripts/check_aws_map.py                          # estructura + tipos CloudFormation (si cfn-lint está)
-    python scripts/check_aws_map.py --provider-schema s.json # además: tipos y atributos contra el proveedor AWS
-    python scripts/check_aws_map.py --download-schema        # genera el esquema con `terraform providers schema`
-    python scripts/check_aws_map.py --coverage cov.json      # informe de tipos sin mapear (GET /api/aws-map/coverage)
+    python scripts/check_aws_map.py                          # structure + CloudFormation types (if cfn-lint is installed)
+    python scripts/check_aws_map.py --provider-schema s.json # also: types and attributes against the AWS provider
+    python scripts/check_aws_map.py --download-schema        # generates the schema with `terraform providers schema`
+    python scripts/check_aws_map.py --coverage cov.json      # report of unmapped types (GET /api/aws-map/coverage)
     python scripts/check_aws_map.py --coverage cov.json --propose
 
-Las propuestas NUNCA se aplican solas: emparejar nombres sin revisión sería adivinar. Se imprimen para que una
-persona las revise, ajuste la identidad y las copie a resource_map.json.
-Código de salida 1 si el mapa tiene errores; los tipos sin mapear son un aviso (el mapa puede ir por detrás).
+Proposals are NEVER applied automatically: matching names without review would be guessing. They are printed so a
+person can review them, adjust the identity and copy them to resource_map.json.
+Exit code 1 if the map has errors; unmapped types are a warning (the map may lag behind).
 """
 
 from __future__ import annotations
@@ -37,11 +37,11 @@ from terraformation.aws_map.loader import (
 PROVIDER = "registry.terraform.io/hashicorp/aws"
 ALWAYS_VALID_ATTRS = {
     "id"
-}  # `id` existe en todos los recursos aunque el esquema no lo liste siempre
+}  # `id` exists on every resource even if the schema does not always list it
 
 
 def cfn_types() -> set[str] | None:
-    """Tipos de CloudFormation conocidos (de cfn-lint). ``None`` si cfn-lint no está instalado."""
+    """Known CloudFormation types (from cfn-lint). ``None`` if cfn-lint is not installed."""
     try:
         import cfnlint
     except ImportError:
@@ -62,7 +62,7 @@ def cfn_types() -> set[str] | None:
 def download_schema() -> dict:
     terraform = shutil.which("terraform")
     if not terraform:
-        sys.exit("terraform no está en el PATH: pasa --provider-schema <archivo>")
+        sys.exit("terraform is not on the PATH: pass --provider-schema <file>")
     with tempfile.TemporaryDirectory() as tmp:
         Path(tmp, "main.tf").write_text(
             'terraform { required_providers { aws = { source = "hashicorp/aws" } } }\n',
@@ -76,7 +76,7 @@ def download_schema() -> dict:
                 cmd, cwd=tmp, capture_output=True, text=True, check=False
             )
             if r.returncode:
-                sys.exit(f"falló `{' '.join(cmd[1:])}`: {r.stderr[:300]}")
+                sys.exit(f"failed `{' '.join(cmd[1:])}`: {r.stderr[:300]}")
         return json.loads(r.stdout)
 
 
@@ -88,15 +88,15 @@ def provider_resources(schema: dict) -> dict[str, set[str]]:
 def check_structure(rmap: ResourceMap) -> list[str]:
     errors: list[str] = []
     if rmap.state not in (STATE_OK, STATE_DEGRADED):
-        return [f"el mapa no se puede cargar: {'; '.join(rmap.issues)}"]
+        return [f"the map cannot be loaded: {'; '.join(rmap.issues)}"]
     errors += [
-        f"entrada inválida — {issue}"
+        f"invalid entry — {issue}"
         for issue in rmap.issues
         if not issue.startswith("reviewed_at")
     ]
     for tf, e in rmap.entries.items():
         if e.parent and e.parent.type not in rmap.entries:
-            errors.append(f"{tf}: el padre {e.parent.type} no tiene entrada en el mapa")
+            errors.append(f"{tf}: parent {e.parent.type} has no entry in the map")
         seen, cur = {tf}, e
         while cur.parent and cur.parent.type in rmap.entries:
             cur = rmap.entries[cur.parent.type]
@@ -109,7 +109,7 @@ def check_structure(rmap: ResourceMap) -> list[str]:
 
 def check_cfn(rmap: ResourceMap, known: set[str]) -> list[str]:
     return [
-        f"{tf}: cfn_type {e.cfn_type} no existe en CloudFormation"
+        f"{tf}: cfn_type {e.cfn_type} does not exist in CloudFormation"
         for tf, e in rmap.entries.items()
         if e.cfn_type and e.cfn_type not in known
     ]
@@ -123,21 +123,21 @@ def check_provider(rmap: ResourceMap, schema: dict[str, set[str]]) -> list[str]:
 
     for tf, e in rmap.entries.items():
         if tf not in schema:
-            errors.append(f"{tf}: el tipo no existe en el proveedor AWS")
+            errors.append(f"{tf}: the type does not exist in the AWS provider")
             continue
         for attr in (*e.identity, *e.name):
             if not ok_attr(tf, attr):
-                errors.append(f"{tf}: el atributo '{attr}' no existe en el esquema")
+                errors.append(f"{tf}: attribute '{attr}' does not exist in the schema")
         if e.parent:
             if not ok_attr(tf, e.parent.child_attr):
                 errors.append(
-                    f"{tf}: child_attr '{e.parent.child_attr}' no existe en el esquema"
+                    f"{tf}: child_attr '{e.parent.child_attr}' does not exist in the schema"
                 )
             if e.parent.type in schema:
                 for attr in e.parent.parent_attr:
                     if not ok_attr(e.parent.type, attr):
                         errors.append(
-                            f"{tf}: parent_attr '{attr}' no existe en {e.parent.type}"
+                            f"{tf}: parent_attr '{attr}' does not exist in {e.parent.type}"
                         )
     return errors
 
@@ -148,12 +148,12 @@ def normalize_cfn(cfn: str) -> str:
 
 def propose(types: list[str], known: set[str] | None) -> None:
     index = {normalize_cfn(c): c for c in known or ()}
-    print("\n== Propuestas (REVISIÓN HUMANA OBLIGATORIA; no se aplican) ==")
+    print("\n== Proposals (HUMAN REVIEW REQUIRED; not applied) ==")
     for tf in types:
         cfn = index.get(tf.removeprefix("aws_"))
         if cfn is None:
             print(
-                f"- {tf}: sin candidato exacto en CloudFormation; mapear a mano si procede (¿es hijo de otro recurso?)"
+                f"- {tf}: no exact candidate in CloudFormation; map by hand if appropriate (is it a child of another resource?)"
             )
             continue
         entry = {
@@ -163,7 +163,7 @@ def propose(types: list[str], known: set[str] | None) -> None:
             "status": "provisional",
         }
         print(
-            f'- {tf}: candidato {cfn} (coincidencia exacta de nombre, NO verificada)\n  "{tf}": {json.dumps(entry)}'
+            f'- {tf}: candidate {cfn} (exact name match, NOT verified)\n  "{tf}": {json.dumps(entry)}'
         )
 
 
@@ -193,12 +193,12 @@ def main() -> int:
     rmap = load_map(args.map)
     errors = check_structure(rmap)
     print(
-        f"mapa: estado={rmap.state} entradas={len(rmap.entries)} revisado={rmap.reviewed_at} desactualizado={rmap.stale}"
+        f"map: state={rmap.state} entries={len(rmap.entries)} reviewed={rmap.reviewed_at} stale={rmap.stale}"
     )
     known = cfn_types()
     if known is None:
         print(
-            "aviso: cfn-lint no está instalado; no se comprueban los tipos de CloudFormation"
+            "warning: cfn-lint is not installed; CloudFormation types are not checked"
         )
     else:
         errors += check_cfn(rmap, known)
@@ -211,16 +211,18 @@ def main() -> int:
         errors += check_provider(rmap, provider_resources(schema))
     else:
         print(
-            "aviso: sin esquema del proveedor; no se comprueban tipos ni atributos de Terraform"
+            "warning: no provider schema; Terraform types and attributes are not checked"
         )
     if rmap.stale:
-        print(f"aviso: el mapa lleva más de {rmap.stale_after_days} días sin revisarse")
+        print(
+            f"warning: the map has gone more than {rmap.stale_after_days} days without review"
+        )
         if args.fail_on_stale:
-            errors.append("mapa desactualizado")
+            errors.append("map is stale")
 
     if args.coverage:
         gaps = read_unmapped(args.coverage)
-        print(f"\ntipos aws_* sin mapear en el bucket: {len(gaps)}")
+        print(f"\nunmapped aws_* types in the bucket: {len(gaps)}")
         for t in gaps:
             print(f"- {t}")
         if args.propose:

@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Terraformation - tabla única de DynamoDB y cola SQS de dead-letter
+Description: Terraformation - single DynamoDB table and SQS dead-letter queue
 
 Parameters:
   AppName: { Type: String }
@@ -65,7 +65,7 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: ttl
         Enabled: true
-      # Clave administrada por AWS (aws/dynamodb): cifrado en reposo sin costo de KMS.
+      # AWS managed key (aws/dynamodb): encryption at rest with no KMS cost.
       SSESpecification:
         SSEEnabled: true
       PointInTimeRecoverySpecification:
@@ -75,9 +75,9 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_119
-            comment: Se usa la clave administrada por AWS para evitar el costo de una CMK de KMS
+            comment: The AWS managed key is used to avoid the cost of a KMS CMK
           - id: CKV_AWS_28
-            comment: PITR es opcional (parámetro PointInTimeRecovery) para mantener el costo mínimo; el historial se reconstruye desde S3
+            comment: PITR is optional (PointInTimeRecovery parameter) to keep cost minimal; the history can be rebuilt from S3
       guard:
         SuppressedRules:
           - DYNAMODB_TABLE_ENCRYPTED_KMS
@@ -92,13 +92,13 @@ Resources:
       checkov:
         skip:
           - id: CKV_AWS_27
-            comment: SSE-SQS (clave administrada por AWS) evita el costo de KMS
+            comment: SSE-SQS (AWS managed key) avoids the KMS cost
 
   DeadLetterQueueAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "${AppName}-${Environment}-dlq-not-empty"
-      AlarmDescription: Hay eventos fallidos en la DLQ de Terraformation
+      AlarmDescription: There are failed events in the Terraformation DLQ
       Namespace: AWS/SQS
       MetricName: ApproximateNumberOfMessagesVisible
       Dimensions:

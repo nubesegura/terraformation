@@ -1,264 +1,271 @@
 # Terraformation
 
-Visor **serverless** de Terraform states almacenados en un backend remoto **AWS S3**. Es un sucesor
-moderno, enfocado solo en S3, de [terraboard](https://github.com/camptocamp/terraboard) (sin
-mantenimiento desde hace años). Licencia **Apache-2.0** — ver [NOTICE](NOTICE).
+> 🇪🇸 Documentación en español: [docs-es/README.md](docs-es/README.md)
 
-* **Dirigido por eventos**: S3 → EventBridge → Lambda. Sin polling, sin servidores, sin base de datos que administrar.
-* **Historial completo** gracias al versionado de S3 (`ListObjectVersions` + `GetObject` por `versionId`).
-* **Locks nativos de S3** (`<proyecto>/terraform.tfstate.tflock`): bloqueado / liberado / sin locking detectado, con alerta por duración.
-* **Seguro**: el state crudo nunca se guarda en DynamoDB; secretos enmascarados en la ingesta; IAM de mínimo privilegio; Cognito + JWT.
-* **Barato**: HTTP API, EventBridge, SQS y DynamoDB provisionada dentro del free tier. Costo típico de una carga pequeña: centavos al mes.
+**Serverless** viewer for Terraform states stored in a remote **AWS S3** backend. It is a modern successor,
+focused on S3 only, of [terraboard](https://github.com/camptocamp/terraboard) (unmaintained for years). License
+**Apache-2.0** — see [NOTICE](NOTICE).
 
-> **Alcance**: solo S3. No hay soporte para GCS, Terraform Cloud, GitLab, MinIO ni tablas de locks de DynamoDB.
+* **Event-driven**: S3 → EventBridge → Lambda. No polling, no servers, no database to manage.
+* **Full history** thanks to S3 versioning (`ListObjectVersions` + `GetObject` by `versionId`).
+* **Native S3 locks** (`<project>/terraform.tfstate.tflock`): locked / released / no locking detected, with a duration alert.
+* **Secure**: the raw state is never stored in DynamoDB; secrets masked at ingestion; least-privilege IAM; Cognito + JWT.
+* **Cheap**: HTTP API, EventBridge, SQS and provisioned DynamoDB within the free tier. Typical cost of a small workload: cents per month.
+* **Bilingual UI**: English by default, with a language button (EN / ES) in the app bar.
 
----
-
-## Contenido
-
-1. [Arquitectura](#arquitectura)
-2. [Convenciones del bucket y de los locks](#convenciones-del-bucket-y-de-los-locks)
-3. [Funcionalidades (y equivalencias con terraboard)](#funcionalidades-y-equivalencias-con-terraboard)
-4. [Costos estimados](#costos-estimados)
-5. [Prerrequisitos](#prerrequisitos)
-6. [Despliegue paso a paso](#despliegue-paso-a-paso)
-7. [Backfill inicial y reconciliación](#backfill-inicial-y-reconciliación)
-8. [Lifecycle recomendado para los `.tflock`](#lifecycle-recomendado-para-los-tflock)
-9. [Parámetros del stack](#parámetros-del-stack)
-10. [Operación y diagnóstico](#operación-y-diagnóstico)
-11. [Seguridad](#seguridad)
-12. [Desarrollo](#desarrollo)
-13. [Gitflow, CI/CD y environments](#gitflow-cicd-y-environments)
-14. [Limitaciones conocidas](#limitaciones-conocidas)
+> **Scope**: S3 only. No support for GCS, Terraform Cloud, GitLab, MinIO or DynamoDB lock tables.
 
 ---
 
-## Arquitectura
+## Contents
+
+1. [Architecture](#architecture)
+2. [Bucket and lock conventions](#bucket-and-lock-conventions)
+3. [Features (and terraboard equivalents)](#features-and-terraboard-equivalents)
+4. [Estimated costs](#estimated-costs)
+5. [Prerequisites](#prerequisites)
+6. [Step-by-step deployment](#step-by-step-deployment)
+7. [Initial backfill and reconciliation](#initial-backfill-and-reconciliation)
+8. [Recommended lifecycle for `.tflock` files](#recommended-lifecycle-for-tflock-files)
+9. [Stack parameters](#stack-parameters)
+10. [Operations and troubleshooting](#operations-and-troubleshooting)
+11. [Security](#security)
+12. [Development](#development)
+13. [Languages](#languages)
+14. [Gitflow, CI/CD and environments](#gitflow-cicd-and-environments)
+15. [Known limitations](#known-limitations)
+
+---
+
+## Architecture
 
 ```mermaid
 flowchart LR
-  subgraph S3["Bucket de states (existente, versionado)"]
-    ST["proyecto/terraform.tfstate"]
-    LK["proyecto/terraform.tfstate.tflock (efímero)"]
+  subgraph S3["States bucket (existing, versioned)"]
+    ST["project/terraform.tfstate"]
+    LK["project/terraform.tfstate.tflock (ephemeral)"]
   end
-  S3 -- "Object Created / Deleted<br/>(EventBridge habilitado)" --> EB(("EventBridge<br/>bus default"))
-  EB -- "regla suffix .tfstate" --> ING["Lambda ingest<br/>(idempotente)"]
-  EB -- "regla suffix .tflock" --> LCK["Lambda locks"]
-  SCH["EventBridge Scheduler<br/>(semanal)"] --> REC["Lambda reconcile"]
-  BF["Lambda backfill<br/>(manual, auto-continúa)"]
+  S3 -- "Object Created / Deleted<br/>(EventBridge enabled)" --> EB(("EventBridge<br/>default bus"))
+  EB -- "rule suffix .tfstate" --> ING["Lambda ingest<br/>(idempotent)"]
+  EB -- "rule suffix .tflock" --> LCK["Lambda locks"]
+  SCH["EventBridge Scheduler<br/>(weekly)"] --> REC["Lambda reconcile"]
+  BF["Lambda backfill<br/>(manual, self-continuing)"]
   ING & LCK & REC & BF -- "GetObject(versionId)<br/>ListObjectVersions" --> S3
-  ING & LCK & REC & BF --> DDB[("DynamoDB<br/>tabla única + 2 GSI")]
-  ING -. "fallos" .-> DLQ[["SQS DLQ"]]
-  LCK -. "fallos" .-> DLQ
-  EB -. "entrega fallida" .-> DLQ
+  ING & LCK & REC & BF --> DDB[("DynamoDB<br/>single table + 2 GSI")]
+  ING -. "failures" .-> DLQ[["SQS DLQ"]]
+  LCK -. "failures" .-> DLQ
+  EB -. "failed delivery" .-> DLQ
 
   subgraph Web["Frontend"]
-    CF["CloudFront + OAC"] --> SITE[("S3 privado<br/>Flutter web")]
+    CF["CloudFront + OAC"] --> SITE[("Private S3<br/>Flutter web")]
   end
-  USER(("Usuario")) --> CF
+  USER(("User")) --> CF
   USER -- "managed login<br/>(Authorization Code + PKCE)" --> COG["Amazon Cognito"]
   USER -- "Bearer JWT" --> APIGW["API Gateway<br/>HTTP API + JWT authorizer"]
   APIGW --> API["Lambda API<br/>(FastAPI + Mangum)"]
-  APIGW -- "POST /api/plans (opcional)" --> PLN["Lambda plans"]
+  APIGW -- "POST /api/plans (optional)" --> PLN["Lambda plans"]
   API --> DDB
-  API -- "detalle / diff / grafo<br/>GetObject(versionId)" --> S3
+  API -- "detail / diff / graph<br/>GetObject(versionId)" --> S3
   PLN --> DDB
-  API -. "opcional" .-> BED["Amazon Bedrock<br/>(resumen de cambios)"]
+  API -. "optional" .-> BED["Amazon Bedrock<br/>(change summary)"]
 ```
 
-### Componentes
+### Components
 
-| Pieza | Tecnología | Responsabilidad |
+| Piece | Technology | Responsibility |
 |---|---|---|
-| `infra/` | CloudFormation + SAM (stack raíz + 4 anidados) | Toda la infraestructura (sin Terraform) |
-| `backend/src/terraformation` | Python 3.13, **Pydantic v2**, **FastAPI**, Powertools | Parser, diff, grafo, ingesta, locks, API |
-| `frontend/` | Flutter web, Riverpod, go_router, fl_chart | UI: dashboard, timeline, diff, grafo, búsqueda, locks |
-| `docs/openapi.yaml` | Generado por FastAPI | Contrato de la API (el cliente Dart se valida contra él) |
-| `docs/DECISIONS.md` | — | Decisiones de diseño y su justificación |
-| `docs/DATA_MODEL.md` | — | Tabla única de DynamoDB y patrones de acceso |
+| `infra/` | CloudFormation + SAM (root stack + 4 nested) | All the infrastructure (no Terraform) |
+| `backend/src/terraformation` | Python 3.13, **Pydantic v2**, **FastAPI**, Powertools | Parser, diff, graph, ingestion, locks, API |
+| `frontend/` | Flutter web, Riverpod, go_router, fl_chart | UI: dashboard, timeline, diff, graph, search, locks |
+| `docs/openapi.yaml` | Generated by FastAPI | API contract (the Dart client is validated against it) |
+| `docs/DECISIONS.md` | — | Design decisions and their rationale |
+| `docs/DATA_MODEL.md` | — | Single DynamoDB table and access patterns |
+| `docs/AWS_MAP.md` | — | Terraform → AWS resources map |
 
-### Flujo de eventos
+### Event flow
 
-1. **Alguien ejecuta `terraform apply`** → S3 crea una nueva versión de `proyecto/terraform.tfstate` y emite `Object Created` a EventBridge con su `version-id`.
-2. La regla filtra por **sufijo** `terraform.tfstate` y llama a la **Lambda de ingesta**:
-   1. `HeadObject(versionId)` → `LastModified`; si el ítem `VERSION#<LastModified>#<versionId>` ya existe → *duplicado*, se ignora (idempotencia por `bucket/key/versionId`).
-   2. `GetObject(versionId)` → parser v4 → enmascarado de secretos.
-   3. Calcula `+agregados / −eliminados / ~modificados` contra la versión anterior (y recalcula el sucesor si el evento llegó **fuera de orden**).
-   4. Si es la versión más reciente por `(LastModified, serial)` actualiza el resumen del proyecto y los ítems de recursos (solo los que cambiaron).
-   5. Escribe el ítem de versión en una transacción (con contadores de actividad).
-3. Los fallos se reintentan (política de EventBridge + invocación asíncrona de Lambda) y terminan en la **DLQ de SQS**.
-4. **Locks**: un `.tflock` creado/borrado dispara la Lambda de locks. Los eventos solo *disparan*; el estado se reconstruye con `ListObjectVersions(Prefix=<key>)` (versión más reciente ⇒ bloqueado, *delete marker* más reciente ⇒ liberado). Es idempotente y tolera duplicados y desorden.
-5. El **backfill** (una vez) y la **reconciliación semanal** recorren todas las versiones por si faltó algún evento.
+1. **Someone runs `terraform apply`** → S3 creates a new version of `project/terraform.tfstate` and emits `Object Created` to EventBridge with its `version-id`.
+2. The rule filters by **suffix** `terraform.tfstate` and calls the **ingestion Lambda**:
+   1. `HeadObject(versionId)` → `LastModified`; if the `VERSION#<LastModified>#<versionId>` item already exists → *duplicate*, ignored (idempotency by `bucket/key/versionId`).
+   2. `GetObject(versionId)` → v4 parser → secret masking.
+   3. Computes `+added / −removed / ~modified` against the previous version (and recalculates the successor if the event arrived **out of order**).
+   4. If it is the newest version by `(LastModified, serial)`, it updates the project summary and the resource items (only the ones that changed).
+   5. Writes the version item in a transaction (with activity counters).
+3. Failures are retried (EventBridge policy + asynchronous Lambda invocation) and end up in the **SQS DLQ**.
+4. **Locks**: a created/deleted `.tflock` triggers the locks Lambda. Events only *trigger*; the state is rebuilt with `ListObjectVersions(Prefix=<key>)` (newest version ⇒ locked, newest *delete marker* ⇒ released). It is idempotent and tolerates duplicates and out-of-order delivery.
+5. The **backfill** (once) and the **weekly reconciliation** walk every version in case an event was missed.
 
-Detalles y razones de cada decisión: [`docs/DECISIONS.md`](docs/DECISIONS.md).
+Details and the reasons behind each decision: [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
-### Estados de lock en la UI
+### Lock states in the UI
 
-| Estado | Significado |
+| State | Meaning |
 |---|---|
-| 🔒 **Bloqueado** | Existe un `.tflock` vigente. Se muestra quién (`Who`), operación, versión de Terraform y desde cuándo (`Created`). Si supera el umbral (`LockAlertMinutes`, 30 por defecto) se resalta como **alerta**. |
-| 🔓 **Liberado** | El último evento fue un *delete marker* del `.tflock`. |
-| ❔ **Sin locking detectado** | Nunca se vio un `.tflock` para ese state → posible falta de `use_lockfile = true`. |
+| 🔒 **Locked** | A current `.tflock` exists. Shows who (`Who`), operation, Terraform version and since when (`Created`). If it exceeds the threshold (`LockAlertMinutes`, 30 by default) it is highlighted as an **alert**. |
+| 🔓 **Released** | The last event was a *delete marker* of the `.tflock`. |
+| ❔ **No locking detected** | A `.tflock` was never seen for that state → `use_lockfile = true` may be missing. |
 
 ---
 
-## Convenciones del bucket y de los locks
+## Bucket and lock conventions
 
-* Cada **key de la raíz** del bucket es un **proyecto**. Dentro del proyecto se detecta **cualquier archivo `*.tfstate` a cualquier profundidad**: `proyecto/terraform.tfstate`, `proyecto/network/prod.tfstate`, `proyecto/apps/web/terraform.tfstate`…
-* **Workspaces** (prefijo por defecto de Terraform): `env:/<workspace>/proyecto/<ruta>.tfstate`. El prefijo `env:` nunca se interpreta como proyecto.
-* Un *state* en la UI es **proyecto + workspace + ruta** (la ruta relativa al proyecto, incluido el archivo). El dashboard agrupa los states por proyecto. Un `.tfstate` suelto en la raíz del bucket (sin proyecto) se ignora.
-* **Locking nativo de S3** (Terraform ≥ 1.10): `proyecto/terraform.tfstate.tflock`, existe solo mientras corre un `plan`/`apply`. En reposo el bucket contiene solo los `.tfstate`.
-* Los `.tflock` **jamás** se tratan como state: las reglas de EventBridge filtran por los sufijos `.tfstate` y `.tfstate.tflock` y el parser de keys exige que el key termine exactamente en `.tfstate`.
+* Every **key at the root** of the bucket is a **project**. Inside the project, **any `*.tfstate` file at any depth** is detected: `project/terraform.tfstate`, `project/network/prod.tfstate`, `project/apps/web/terraform.tfstate`…
+* **Workspaces** (Terraform's default prefix): `env:/<workspace>/project/<path>.tfstate`. The `env:` prefix is never interpreted as a project.
+* A *state* in the UI is **project + workspace + path** (the path relative to the project, file included). The dashboard groups states by project. A stray `.tfstate` at the bucket root (no project) is ignored.
+* **Native S3 locking** (Terraform ≥ 1.10): `project/terraform.tfstate.tflock`, which exists only while a `plan`/`apply` runs. At rest the bucket contains only the `.tfstate` files.
+* `.tflock` files are **never** treated as state: the EventBridge rules filter by the `.tfstate` and `.tfstate.tflock` suffixes and the key parser requires the key to end exactly in `.tfstate`.
 
-Backend de Terraform esperado:
+Expected Terraform backend:
 
 ```hcl
 terraform {
   backend "s3" {
-    bucket       = "<tu-bucket>"
-    key          = "<proyecto>/<ruta-opcional>/terraform.tfstate"   # cualquier nombre terminado en .tfstate
+    bucket       = "<your-bucket>"
+    key          = "<project>/<optional-path>/terraform.tfstate"   # any name ending in .tfstate
     region       = "us-east-1"
     encrypt      = true
-    use_lockfile = true   # locking nativo de S3 (genera el .tflock)
+    use_lockfile = true   # native S3 locking (produces the .tflock)
   }
 }
 ```
 
 ---
 
-## Funcionalidades (y equivalencias con terraboard)
+## Features (and terraboard equivalents)
 
-| Componente de terraboard | Reemplazo serverless en Terraformation |
+| terraboard component | Serverless replacement in Terraformation |
 |---|---|
-| Binario Go + servidor HTTP (`main.go`, `api/`) | **API Gateway HTTP API** + Lambda **FastAPI/Mangum** (`api/app.py`); contrato OpenAPI generado |
-| Base de datos SQL (GORM: PostgreSQL/SQLite, `db/`, `types/db.go`) | **DynamoDB** tabla única + 2 GSI (`store.py`, [modelo](docs/DATA_MODEL.md)); sin guardar el state crudo |
-| Sincronización periódica por polling (`state/aws.go`) | **Eventos** S3 → EventBridge → Lambda `ingest`; backfill inicial + reconciliación semanal (Scheduler) |
-| Proveedores `state/` (S3, GCS, TFC, GitLab) | Solo **S3** (`s3io.py`); lectura por `versionId` |
-| Parser del state (`state/state.go`, `types/json.go`) | `parser.py` — state **v4** (TF 0.12 → 1.x y OpenTofu), con `dependencies`, `sensitive_attributes` y enmascarado |
-| Comparación (`compare/`) | `diff.py` — agregados/eliminados/modificados con detalle de atributos, diff unificado y lado a lado, `sensitive_changed` |
-| Búsqueda por tipo/nombre/módulo/atributo (`db.go`) | `GET /api/search` sobre GSI1 (tipo), GSI2 (nombre) y consulta por proyecto |
-| `/api/locks` (consulta a DynamoDB de locks) | **Locks nativos de S3** vía eventos `.tflock`; `GET /api/locks`, historial por proyecto |
-| `POST /api/plans` | Igual payload (`lineage`, `terraform_version`, `git_remote`, `git_commit`, `ci_url`, `source`, `plan_json`); Lambda separada, opcional (`EnablePlansApi`) |
+| Go binary + HTTP server (`main.go`, `api/`) | **API Gateway HTTP API** + **FastAPI/Mangum** Lambda (`api/app.py`); generated OpenAPI contract |
+| SQL database (GORM: PostgreSQL/SQLite, `db/`, `types/db.go`) | **DynamoDB** single table + 2 GSI (`store.py`, [model](docs/DATA_MODEL.md)); raw state is not stored |
+| Periodic polling sync (`state/aws.go`) | S3 → EventBridge → `ingest` Lambda **events**; initial backfill + weekly reconciliation (Scheduler) |
+| `state/` providers (S3, GCS, TFC, GitLab) | **S3** only (`s3io.py`); reads by `versionId` |
+| State parser (`state/state.go`, `types/json.go`) | `parser.py` — **v4** state (TF 0.12 → 1.x and OpenTofu), with `dependencies`, `sensitive_attributes` and masking |
+| Comparison (`compare/`) | `diff.py` — added/removed/modified with attribute detail, unified and side-by-side diff, `sensitive_changed` |
+| Search by type/name/module/attribute (`db.go`) | `GET /api/search` over GSI1 (type), GSI2 (name) and project query |
+| `/api/locks` (DynamoDB locks lookup) | **Native S3 locks** via `.tflock` events; `GET /api/locks`, per-project history |
+| `POST /api/plans` | Same payload (`lineage`, `terraform_version`, `git_remote`, `git_commit`, `ci_url`, `source`, `plan_json`); separate, optional Lambda (`EnablePlansApi`) |
 | `/api/lineages`, `/api/lineages/stats` | `GET /api/projects`, `GET /api/dashboard` |
 | `/api/state/...` | `GET /api/projects/{p}/versions/{versionId}` |
 | `/api/state/compare` | `GET /api/projects/{p}/diff` |
-| Frontend Vue.js | **Flutter web** (Riverpod): dashboard, timeline, grafo, diff, búsqueda |
-| Autenticación (proxy/OIDC externo) | **Amazon Cognito** (managed login) + authorizer **JWT** nativo de HTTP API |
-| Docker / docker-compose / Helm | **CloudFormation/SAM** + CloudFront + S3 privado (OAC) |
-| Logs logrus | Logs **JSON estructurados** (Powertools) con retención configurable |
-| Swagger (swag) | OpenAPI de FastAPI en [`docs/openapi.yaml`](docs/openapi.yaml) |
+| Vue.js frontend | **Flutter web** (Riverpod): dashboard, timeline, graph, diff, search |
+| Authentication (external proxy/OIDC) | **Amazon Cognito** (managed login) + native HTTP API **JWT** authorizer |
+| Docker / docker-compose / Helm | **CloudFormation/SAM** + CloudFront + private S3 (OAC) |
+| logrus logs | Structured **JSON** logs (Powertools) with configurable retention |
+| Swagger (swag) | FastAPI OpenAPI in [`docs/openapi.yaml`](docs/openapi.yaml) |
 
-### Novedades respecto al original
+### What is new compared to the original
 
-* Dashboard con recursos por proyecto/tipo/provider/módulo, versiones de Terraform en uso y actividad en el tiempo.
-* Indicador de proyectos bloqueados (quién, desde cuándo, qué operación) y alerta por duración.
-* Línea de tiempo por proyecto con conteo de cambios y marcas de lock/unlock.
-* **Grafo interactivo** de dependencias entre recursos (y vista de dependencias entre módulos) a partir de `dependencies`.
-* Diff con colores, vista unificada y lado a lado; detección de cambios en valores sensibles sin exponerlos.
-* Resumen opcional en lenguaje natural con **Amazon Bedrock** (`EnableBedrockSummary=false` por defecto).
+* Dashboard with resources per project/type/provider/module, Terraform versions in use and activity over time.
+* Locked-project indicator (who, since when, which operation) and duration alert.
+* Per-project timeline with change counts and lock/unlock marks.
+* **Interactive graph** of resource dependencies (and a module dependency view) built from `dependencies`.
+* Colored diff, unified and side-by-side view; change detection on sensitive values without exposing them.
+* Optional natural-language summary with **Amazon Bedrock** (`EnableBedrockSummary=false` by default), in the language selected in the UI.
+* **AWS resources view**: the AWS resources a state deploys, grouped like CloudFormation does ([`docs/AWS_MAP.md`](docs/AWS_MAP.md)).
+* **English / Spanish UI** with a language button.
 
 ---
 
-## Costos estimados
+## Estimated costs
 
-Carga pequeña de referencia: ~20 proyectos, ~300 `apply`/mes (≈600 eventos de state y lock), 5 usuarios,
-~2.000 llamadas a la API/mes, región us-east-1. **Estimación orientativa** — verifica con la
-[AWS Pricing Calculator](https://calculator.aws/) porque los precios cambian.
+Small reference workload: ~20 projects, ~300 `apply`/month (≈600 state and lock events), 5 users,
+~2,000 API calls/month, us-east-1 region. **Indicative estimate** — check the
+[AWS Pricing Calculator](https://calculator.aws/) because prices change.
 
-| Servicio | Uso | Costo mensual aprox. |
+| Service | Usage | Approx. monthly cost |
 |---|---|---|
-| Lambda (arm64) | < 5.000 invocaciones, segundos de cómputo | **$0** (free tier) |
-| DynamoDB provisionada | 5/5 + 2/5 + 2/5 RCU/WCU (< 25/25 del free tier), < 1 GB | **$0** |
-| API Gateway HTTP API | ~2.000 solicitudes | **< $0,01** |
-| EventBridge (eventos de S3, Scheduler) | eventos de servicios AWS sobre el bus default | **$0** |
-| SQS (DLQ) | casi sin tráfico | **$0** |
-| Cognito (Essentials) | 5 MAU (primeros 10.000 gratis) | **$0** |
-| CloudFront + S3 (frontend) | < 1 GB de transferencia, < 20 MB almacenados | **$0 – $0,05** |
-| S3 (solicitudes sobre el bucket de states) | ~3.000 GET/LIST | **< $0,02** |
-| CloudWatch Logs (retención 14 días) | ~50 MB | **~$0,03** |
-| CloudWatch Alarm (DLQ) | 1 alarma (10 gratis) | **$0** |
-| KMS | claves administradas por AWS | **$0** |
-| X-Ray / Bedrock | desactivados por defecto | **$0** |
-| **Total** | | **≈ $0,05 – $0,50 / mes** |
+| Lambda (arm64) | < 5,000 invocations, seconds of compute | **$0** (free tier) |
+| DynamoDB provisioned | 5/5 + 2/5 + 2/5 RCU/WCU (< 25/25 free tier), < 1 GB | **$0** |
+| API Gateway HTTP API | ~2,000 requests | **< $0.01** |
+| EventBridge (S3 events, Scheduler) | AWS service events on the default bus | **$0** |
+| SQS (DLQ) | almost no traffic | **$0** |
+| Cognito (Essentials) | 5 MAU (first 10,000 free) | **$0** |
+| CloudFront + S3 (frontend) | < 1 GB transfer, < 20 MB stored | **$0 – $0.05** |
+| S3 (requests on the states bucket) | ~3,000 GET/LIST | **< $0.02** |
+| CloudWatch Logs (14-day retention) | ~50 MB | **~$0.03** |
+| CloudWatch Alarm (DLQ) | 1 alarm (10 free) | **$0** |
+| KMS | AWS-managed keys | **$0** |
+| X-Ray / Bedrock | disabled by default | **$0** |
+| **Total** | | **≈ $0.05 – $0.50 / month** |
 
-Si haces un backfill grande, usa temporalmente `TableBillingMode=PAY_PER_REQUEST` (≈ $1,25 por millón de escrituras).
-
----
-
-## Prerrequisitos
-
-* Cuenta de AWS y permisos para CloudFormation/IAM/Lambda/DynamoDB/SQS/EventBridge/Cognito/CloudFront/S3.
-* **Bucket de states existente** con **versionado habilitado** (no lo administra este proyecto).
-* Terraform ≥ 1.10 con `use_lockfile = true` (para los `.tflock`).
-* **Un bucket S3 para artefactos** de `sam package` (en la misma región; se crea solo si no existe).
-* Herramientas locales: AWS CLI v2, `make`, [`uv`](https://docs.astral.sh/uv/) (Python 3.13), Flutter (stable), `jq` (solo activación manual).
-* Desplegar el stack **en la misma región del bucket de states** (EventBridge entrega los eventos en esa región; una regla del stack lo verifica).
+If you run a large backfill, temporarily use `TableBillingMode=PAY_PER_REQUEST` (≈ $1.25 per million writes).
 
 ---
 
-## Despliegue paso a paso
+## Prerequisites
 
-> Nada de esto se ejecuta automáticamente: **tú** corres los comandos. Revisa con `make changeset` antes de aplicar.
+* An AWS account and permissions for CloudFormation/IAM/Lambda/DynamoDB/SQS/EventBridge/Cognito/CloudFront/S3.
+* An **existing states bucket** with **versioning enabled** (this project does not manage it).
+* Terraform ≥ 1.10 with `use_lockfile = true` (for the `.tflock` files).
+* **An S3 bucket for `sam package` artifacts** (same region; created automatically if it does not exist).
+* Local tools: AWS CLI v2, `make`, [`uv`](https://docs.astral.sh/uv/) (Python 3.13), Flutter (stable), `jq` (manual activation only).
+* Deploy the stack **in the same region as the states bucket** (EventBridge delivers events in that region; a stack rule checks it).
+
+---
+
+## Step-by-step deployment
+
+> None of this runs automatically: **you** run the commands. Review with `make changeset` before applying.
 
 ```bash
-# 0) Entorno local y verificaciones (no tocan AWS)
+# 0) Local environment and checks (they do not touch AWS)
 make install
 make check
 
-# 1) Variables (ajusta a tu caso; usa PROFILE=<perfil> si usas perfiles de AWS CLI)
-export STATE_BUCKET=<bucket-de-states>
-# ARTIFACT_BUCKET es opcional: si se omite, se deriva del estándar de nombres
-# (bckt-<region>-terraformation-artifacts-<cuenta>-<env>) y `make deploy` lo crea si no existe.
-export REGION=<region-del-bucket>
+# 1) Variables (adjust to your case; use PROFILE=<profile> if you use AWS CLI profiles)
+export STATE_BUCKET=<states-bucket>
+# ARTIFACT_BUCKET is optional: if omitted it is derived from the naming standard
+# (bckt-<region>-terraformation-artifacts-<account>-<env>) and `make deploy` creates it if missing.
+export REGION=<states-bucket-region>
 export ENV=dev
 
-# 2) (Opcional pero recomendado) Revisar el change set sin aplicarlo
+# 2) (Optional but recommended) Review the change set without applying it
 make changeset ENV=$ENV REGION=$REGION STATE_BUCKET=$STATE_BUCKET
 
-# 3) Desplegar la infraestructura (empaqueta el código Lambda arm64 y las plantillas anidadas)
+# 3) Deploy the infrastructure (packages the arm64 Lambda code and the nested templates)
 make deploy ENV=$ENV REGION=$REGION STATE_BUCKET=$STATE_BUCKET
-#   Con parámetros extra, por ejemplo:
+#   With extra parameters, for example:
 #   make deploy ... EXTRA_PARAMS="LockAlertMinutes=45 EnablePlansApi=true EnableXRay=true"
 
-# 4) Crear tu usuario de Cognito (no hay auto-registro; recibirás una contraseña temporal por email)
-make create-user ENV=$ENV REGION=$REGION EMAIL=tu@correo.com
+# 4) Create your Cognito user (no self sign-up; you will receive a temporary password by email)
+make create-user ENV=$ENV REGION=$REGION EMAIL=you@example.com
 
-# 5) Publicar el frontend (compila Flutter, genera config.json desde los outputs, sube a S3 e invalida CloudFront)
+# 5) Publish the frontend (builds Flutter, generates config.json from the outputs, uploads to S3 and invalidates CloudFront)
 make web-deploy ENV=$ENV REGION=$REGION
 
-# 6) Cargar el historial existente (ver siguiente sección)
+# 6) Load the existing history (see next section)
 make backfill ENV=$ENV REGION=$REGION
 ```
 
-La URL del frontend aparece en el output `WebUrl` del stack (`aws cloudformation describe-stacks --stack-name terraformation-$ENV`).
+The frontend URL appears in the stack's `WebUrl` output (`aws cloudformation describe-stacks --stack-name terraformation-$ENV`).
 
-### Activación de EventBridge en el bucket
+### Enabling EventBridge on the bucket
 
-`PutBucketNotificationConfiguration` **reemplaza toda** la configuración de notificaciones del bucket. Por eso:
+`PutBucketNotificationConfiguration` **replaces the whole** notification configuration of the bucket. Therefore:
 
-* **Automático (por defecto, `ManageBucketNotifications=true`)**: un custom resource lee la configuración actual
-  (SNS/SQS/Lambda existentes), la reenvía **íntegra** y agrega únicamente `EventBridgeConfiguration`.
-  Permisos del custom resource: solo `s3:GetBucketNotification` y `s3:PutBucketNotification`.
-  Al borrar el stack **no** desactiva EventBridge (otros consumidores podrían depender de él) salvo `DisableNotificationsOnDelete=true`.
-* **Manual (`ManageBucketNotifications=false`)**: el stack no toca el bucket. Activa EventBridge tú mismo:
+* **Automatic (default, `ManageBucketNotifications=true`)**: a custom resource reads the current configuration
+  (existing SNS/SQS/Lambda), sends it back **intact** and only adds `EventBridgeConfiguration`.
+  Custom resource permissions: only `s3:GetBucketNotification` and `s3:PutBucketNotification`.
+  Deleting the stack does **not** disable EventBridge (other consumers may depend on it) unless `DisableNotificationsOnDelete=true`.
+* **Manual (`ManageBucketNotifications=false`)**: the stack does not touch the bucket. Enable EventBridge yourself:
 
   ```bash
-  make enable-eventbridge-manual STATE_BUCKET=<bucket> REGION=<region>            # dry-run: muestra qué se enviaría
-  make enable-eventbridge-manual STATE_BUCKET=<bucket> REGION=<region> APPLY=1     # aplica (conserva lo existente)
+  make enable-eventbridge-manual STATE_BUCKET=<bucket> REGION=<region>            # dry-run: shows what would be sent
+  make enable-eventbridge-manual STATE_BUCKET=<bucket> REGION=<region> APPLY=1     # applies (keeps what exists)
   ```
-  o desde la consola: *S3 → bucket → Properties → Amazon EventBridge → Edit → On*.
+  or from the console: *S3 → bucket → Properties → Amazon EventBridge → Edit → On*.
 
-### Opcional: planes de Terraform (`POST /api/plans`)
+### Optional: Terraform plans (`POST /api/plans`)
 
-Con `EnablePlansApi=true` se crea un cliente Cognito *client-credentials* con scope `terraformation/plans.write`:
+With `EnablePlansApi=true` a *client-credentials* Cognito client with scope `terraformation/plans.write` is created:
 
 ```bash
-# Obtener el secreto del cliente de CI y un token
+# Get the CI client secret and a token
 POOL=$(aws cloudformation describe-stacks --stack-name terraformation-$ENV --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text)
-aws cognito-idp list-user-pool-clients --user-pool-id $POOL      # busca el cliente "...-plans-ci"
+aws cognito-idp list-user-pool-clients --user-pool-id $POOL      # look for the "...-plans-ci" client
 aws cognito-idp describe-user-pool-client --user-pool-id $POOL --client-id <id> --query UserPoolClient.ClientSecret --output text
 TOKEN=$(curl -s -u <client-id>:<secret> -d 'grant_type=client_credentials&scope=terraformation/plans.write' \
-  https://<dominio-cognito>/oauth2/token | jq -r .access_token)
+  https://<cognito-domain>/oauth2/token | jq -r .access_token)
 
 terraform show -json tfplan > plan.json
 jq -n --arg l "<lineage>" --slurpfile p plan.json \
@@ -266,35 +273,35 @@ jq -n --arg l "<lineage>" --slurpfile p plan.json \
  | curl -s -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d @- https://<api>/api/plans
 ```
 
-Se guarda un **resumen** del plan (acciones por recurso y outputs), nunca el JSON crudo.
+A plan **summary** is stored (actions per resource and outputs), never the raw JSON.
 
 ---
 
-## Backfill inicial y reconciliación
+## Initial backfill and reconciliation
 
-* **Backfill** (`make backfill`): la Lambda recorre `ListObjectVersions` de todo el bucket. Por cada `.tfstate` registra *todas* las versiones y *delete markers* históricos en orden ascendente (con conteo de cambios entre versiones consecutivas); por cada `.tflock` reconstruye el historial de locks. Es **idempotente** (puedes repetirlo), omite lo que ya existe y **se auto-reinvoca** con un cursor antes de agotar sus 15 minutos, así que no necesita Step Functions. Los `.tflock` nunca entran al historial de states.
-  * Seguimiento: `aws logs tail /aws/lambda/terraformation-$ENV-backfill --follow`.
-  * Para historiales grandes, cambia temporalmente a `TableBillingMode=PAY_PER_REQUEST`.
-* **Reconciliación** (EventBridge Scheduler, `rate(7 days)` por defecto; parámetros `ReconcileSchedule` y `ReconcileEnabled`): misma lógica como **red de seguridad**; además realinea el estado vigente y los recursos. Ejecución manual: `make reconcile-now`.
-* **Eventos fallidos**: `make dlq-peek` muestra los mensajes de la DLQ; para reprocesar basta `make reconcile-now` (reconstruye desde S3, que es la fuente de verdad). Hay una alarma de CloudWatch cuando la DLQ no está vacía (`AlarmTopicArn` para notificar por SNS).
+* **Backfill** (`make backfill`): the Lambda walks `ListObjectVersions` of the whole bucket. For each `.tfstate` it records *all* historical versions and *delete markers* in ascending order (with change counts between consecutive versions); for each `.tflock` it rebuilds the lock history. It is **idempotent** (you can repeat it), skips what already exists and **reinvokes itself** with a cursor before using up its 15 minutes, so it needs no Step Functions. `.tflock` files never enter the state history.
+  * Follow progress: `aws logs tail /aws/lambda/terraformation-$ENV-backfill --follow`.
+  * For large histories, temporarily switch to `TableBillingMode=PAY_PER_REQUEST`.
+* **Reconciliation** (EventBridge Scheduler, `rate(7 days)` by default; parameters `ReconcileSchedule` and `ReconcileEnabled`): the same logic as a **safety net**; it also realigns the current state and the resources. Manual run: `make reconcile-now`.
+* **Failed events**: `make dlq-peek` shows the DLQ messages; to reprocess, `make reconcile-now` is enough (it rebuilds from S3, the source of truth). A CloudWatch alarm fires when the DLQ is not empty (`AlarmTopicArn` to notify through SNS).
 
 ---
 
-## Lifecycle recomendado para los `.tflock`
+## Recommended lifecycle for `.tflock` files
 
-Los `.tflock` generan versiones no actuales (cada `apply` crea una versión y un *delete marker*). Aunque pesan ~300 bytes, puedes expirarlas.
+`.tflock` files produce non-current versions (each `apply` creates a version and a *delete marker*). Although they weigh ~300 bytes, you can expire them.
 
-> ⚠️ **S3 Lifecycle no filtra por sufijo**, y un filtro por tamaño podría expirar versiones pequeñas de
-> `.tfstate` (un state vacío pesa casi lo mismo que un lock). La forma **segura** es usar como `Prefix` la
-> **key exacta** del lock (`<proyecto>/terraform.tfstate.tflock`): no es prefijo de ningún `.tfstate`.
+> ⚠️ **S3 Lifecycle does not filter by suffix**, and a size filter could expire small `.tfstate`
+> versions (an empty state weighs almost the same as a lock). The **safe** way is to use the lock's
+> **exact key** (`<project>/terraform.tfstate.tflock`) as `Prefix`: it is not a prefix of any `.tfstate`.
 
-Genera las reglas a partir de las keys de tus states (solo lectura en AWS):
+Generate the rules from your states' keys (read-only on AWS):
 
 ```bash
 make lifecycle-rules STATE_BUCKET=<bucket> REGION=<region> DAYS=30 > tflock-rules.json
 ```
 
-Resultado (una regla por lock; ejemplo):
+Result (one rule per lock; example):
 
 ```json
 {
@@ -302,124 +309,135 @@ Resultado (una regla por lock; ejemplo):
     {
       "ID": "tflock-noncurrent-1a2b3c4d5e",
       "Status": "Enabled",
-      "Filter": { "Prefix": "mi-proyecto/terraform.tfstate.tflock" },
+      "Filter": { "Prefix": "my-project/terraform.tfstate.tflock" },
       "NoncurrentVersionExpiration": { "NoncurrentDays": 30 }
     }
   ]
 }
 ```
 
-**Aplícalo tú**, combinándolo con las reglas existentes (`put-bucket-lifecycle-configuration` reemplaza toda la configuración):
+**Apply it yourself**, merging it with the existing rules (`put-bucket-lifecycle-configuration` replaces the whole configuration):
 
 ```bash
-aws s3api get-bucket-lifecycle-configuration --bucket <bucket> > actual.json   # si existe
-# ...fusiona "Rules" de actual.json con tflock-rules.json...
+aws s3api get-bucket-lifecycle-configuration --bucket <bucket> > current.json   # if it exists
+# ...merge "Rules" of current.json with tflock-rules.json...
 aws s3api put-bucket-lifecycle-configuration --bucket <bucket> --lifecycle-configuration file://merged.json
 ```
 
-* Nunca se tocan las versiones de los `.tfstate`.
-* Ejecútalo de nuevo al crear proyectos/workspaces nuevos (límite: 1.000 reglas por bucket).
-* La expiración emite eventos `Object Deleted` con `deletion-type = Permanently Deleted`; la Lambda de locks **no** los interpreta como liberación y el historial ya persistido en DynamoDB se conserva.
+* `.tfstate` versions are never touched.
+* Run it again when you create new projects/workspaces (limit: 1,000 rules per bucket).
+* Expiration emits `Object Deleted` events with `deletion-type = Permanently Deleted`; the locks Lambda does **not** interpret them as a release and the history already persisted in DynamoDB is kept.
 
 ---
 
-## Parámetros del stack
+## Stack parameters
 
-Los principales (lista completa en [`infra/template.yaml`](infra/template.yaml)):
+The main ones (full list in [`infra/template.yaml`](infra/template.yaml)):
 
-| Parámetro | Por defecto | Descripción |
+| Parameter | Default | Description |
 |---|---|---|
-| `AppName`, `Environment` | `terraformation`, `dev` | Prefijo/entorno de los recursos |
-| `StateBucketName` / `StateBucketRegion` | — | Bucket de states y su región (debe coincidir con la del stack) |
-| `ManageBucketNotifications` | `true` | `false` = activar EventBridge manualmente |
-| `TableBillingMode` | `PROVISIONED` | `PAY_PER_REQUEST` para on-demand |
-| `LockAlertMinutes` | `30` | Umbral de alerta de locks activos |
-| `ReconcileSchedule` | `rate(7 days)` | Frecuencia de la reconciliación |
-| `LogRetentionDays` | `14` | Retención de logs |
-| `EnableXRay` | `false` | Trazado X-Ray |
-| `ThrottlingRateLimit/BurstLimit` | `20/40` | Throttling del API |
-| `ExtraWebOrigin` | vacío | Origen extra (CORS/Cognito) para desarrollo local |
-| `EnablePlansApi` | `false` | Habilita `POST /api/plans` |
-| `EnableBedrockSummary` / `BedrockModelId` | `false` / Claude Haiku | Resumen con IA (requiere acceso al modelo en Bedrock) |
+| `AppName`, `Environment` | `terraformation`, `dev` | Resource prefix/environment |
+| `StateBucketName` / `StateBucketRegion` | — | States bucket and its region (must match the stack's) |
+| `ManageBucketNotifications` | `true` | `false` = enable EventBridge manually |
+| `TableBillingMode` | `PROVISIONED` | `PAY_PER_REQUEST` for on-demand |
+| `LockAlertMinutes` | `30` | Alert threshold for active locks |
+| `ReconcileSchedule` | `rate(7 days)` | Reconciliation frequency |
+| `LogRetentionDays` | `14` | Log retention |
+| `EnableXRay` | `false` | X-Ray tracing |
+| `ThrottlingRateLimit/BurstLimit` | `20/40` | API throttling |
+| `ExtraWebOrigin` | empty | Extra origin (CORS/Cognito) for local development |
+| `EnablePlansApi` | `false` | Enables `POST /api/plans` |
+| `EnableBedrockSummary` / `BedrockModelId` | `false` / Claude Haiku | AI summary (requires model access in Bedrock) |
 
 ---
 
-## Operación y diagnóstico
+## Operations and troubleshooting
 
-| Síntoma | Qué revisar |
+| Symptom | What to check |
 |---|---|
-| No llegan eventos | ¿EventBridge está *On* en el bucket? ¿Stack en la misma región? Reglas `…-tfstate` y `…-tflock` en la consola de EventBridge. |
-| El proyecto no aparece | Ejecuta `make backfill`; revisa logs de `…-ingest` y la DLQ (`make dlq-peek`). |
-| "Sin locking detectado" | El backend no usa `use_lockfile = true` o aún no hubo un `plan`/`apply` desde el despliegue (el backfill solo ve locks si existen versiones). |
-| Una versión aparece con error | Formato de state no soportado (solo v4) o tamaño > `MaxStateBytes`: se registra en el historial con `parse_error`. |
-| 401/403 en la API | Token vencido o usuario sin sesión; el JWT debe ser de la pool del stack. |
-| La UI muestra datos desactualizados | `Actualizar` en la barra superior; la API no tiene caché de datos (solo de states parseados por contenedor). |
+| No events arrive | Is EventBridge *On* on the bucket? Stack in the same region? `…-tfstate` and `…-tflock` rules in the EventBridge console. |
+| The project does not show up | Run `make backfill`; check the `…-ingest` logs and the DLQ (`make dlq-peek`). |
+| "No locking detected" | The backend does not use `use_lockfile = true` or there has been no `plan`/`apply` since the deployment (the backfill only sees locks if versions exist). |
+| A version appears with an error | Unsupported state format (v4 only) or size > `MaxStateBytes`: it is recorded in the history with `parse_error`. |
+| 401/403 on the API | Expired token or signed-out user; the JWT must come from the stack's pool. |
+| The UI shows stale data | Use *Refresh* in the top bar; the API has no data cache (only of parsed states per container). |
 
-Logs estructurados (JSON) en CloudWatch: `/aws/lambda/<app>-<env>-{ingest,locks,backfill,reconcile,api,plans}`.
-
----
-
-## Seguridad
-
-* **IAM de mínimo privilegio**, un rol por función: las Lambdas de ingesta solo tienen `s3:GetObject`, `s3:GetObjectVersion`, `s3:ListBucket`, `s3:ListBucketVersions` sobre el bucket de states y únicamente las acciones de DynamoDB/SQS que usan; el custom resource solo `s3:GetBucketNotification` y `s3:PutBucketNotification`; la API es de **solo lectura** sobre DynamoDB y la escritura de planes está en otra función con solo `dynamodb:PutItem`.
-* **Secretos**: el state crudo no se persiste; se enmascaran `sensitive_attributes`, valores con patrones típicos (claves AWS, PEM, JWT, tokens GitHub/Slack…) y atributos por nombre (`password`, `secret`, `token`…). Outputs sensibles se muestran como `(sensitive)`. Los cambios en valores sensibles se detectan con un digest **solo en memoria**.
-* **Cifrado**: claves administradas por AWS (DynamoDB, SQS-SSE, S3 SSE-S3) — sin costo de KMS.
-* **API**: Cognito + authorizer JWT nativo, CORS restringido al dominio de CloudFront, throttling, sin docs públicas.
-* **Frontend**: bucket S3 privado + CloudFront con OAC, HTTPS obligatorio y cabeceras de seguridad (CSP, HSTS, `frame-ancestors 'none'`).
-* **Plantillas validadas** con `cfn-lint`, `checkov` (0 hallazgos; omisiones justificadas en `Metadata`) y reglas propias de `cfn-guard` (`infra/guard`).
-* Nada de credenciales, IDs de cuenta ni nombres reales de buckets en el repo (fixtures anonimizados).
+Structured (JSON) logs in CloudWatch: `/aws/lambda/<app>-<env>-{ingest,locks,backfill,reconcile,api,plans}`.
 
 ---
 
-## Desarrollo
+## Security
+
+* **Least-privilege IAM**, one role per function: the ingestion Lambdas only have `s3:GetObject`, `s3:GetObjectVersion`, `s3:ListBucket`, `s3:ListBucketVersions` on the states bucket and only the DynamoDB/SQS actions they use; the custom resource only `s3:GetBucketNotification` and `s3:PutBucketNotification`; the API is **read-only** on DynamoDB and plan writing lives in another function with only `dynamodb:PutItem`.
+* **Secrets**: the raw state is not persisted; `sensitive_attributes`, values with typical patterns (AWS keys, PEM, JWT, GitHub/Slack tokens…) and attributes by name (`password`, `secret`, `token`…) are masked. Sensitive outputs are shown as `(sensitive)`. Changes in sensitive values are detected with a digest kept **in memory only**.
+* **Encryption**: AWS-managed keys (DynamoDB, SQS-SSE, S3 SSE-S3) — no KMS cost.
+* **API**: Cognito + native JWT authorizer, CORS restricted to the CloudFront domain, throttling, no public docs.
+* **Frontend**: private S3 bucket + CloudFront with OAC, mandatory HTTPS and security headers (CSP, HSTS, `frame-ancestors 'none'`).
+* **Validated templates** with `cfn-lint`, `checkov` (0 findings; justified skips in `Metadata`) and custom `cfn-guard` rules (`infra/guard`).
+* No credentials, account IDs or real bucket names in the repo (anonymized fixtures).
+
+---
+
+## Development
 
 ```bash
-make install        # venv Python 3.13 + dependencias
-make check          # ruff, mypy, pytest (moto), OpenAPI sincronizado, cfn-lint, checkov
-make openapi        # regenera docs/openapi.yaml tras cambiar la API
-make guard          # cfn-guard (requiere el binario)
+make install        # Python 3.13 venv + dependencies
+make check          # ruff, mypy, pytest (moto), OpenAPI in sync, cfn-lint, checkov
+make openapi        # regenerate docs/openapi.yaml after changing the API
+make guard          # cfn-guard (requires the binary)
 make web-analyze web-test web-build
-python scripts/e2e_smoke.py --shots /tmp/shots   # FastAPI + moto + build de Flutter en Chromium
+python scripts/e2e_smoke.py --shots /tmp/shots   # FastAPI + moto + Flutter build in Chromium
 ```
 
-Estructura:
+Layout:
 
 ```
 backend/src/terraformation/   parser · masking · diff · graph · keys · store · ingest · locks · sync · api/ · handlers/
-backend/tests/                pytest + moto + fixtures anonimizados (tfstate 0.12 → 1.9 / OpenTofu, tflock)
+backend/tests/                pytest + moto + anonymized fixtures (tfstate 0.12 → 1.9 / OpenTofu, tflock)
 infra/                        template.yaml + nested/{storage,web,ingestion,api}.yaml + guard/
-frontend/                     Flutter web (features/{dashboard,projects,state,diff,graph,search,locks,shell})
-docs/                         DECISIONS · DATA_MODEL · GITFLOW · openapi.yaml
+frontend/                     Flutter web (features/{dashboard,projects,state,diff,graph,search,locks,shell}, l10n)
+docs/                         DECISIONS · DATA_MODEL · GITFLOW · AWS_MAP · openapi.yaml
+docs-es/                      Spanish version of the documentation
 scripts/                      build_lambda · enable-eventbridge · lifecycle_tflock · export_openapi · e2e_smoke
 ```
 
 ---
 
-## Gitflow, CI/CD y environments
+## Languages
 
-El flujo de ramas (`main` = prod, `develop` = dev, `feature/*`), los *environments* de GitHub
-(`dev`, `prod`) con sus variables y secrets, y los comandos `gh` para crearlos están en
-[`docs/GITFLOW.md`](docs/GITFLOW.md). Workflows: `.github/workflows/ci.yml` (backend, plantillas, frontend)
-y `deploy.yml` (OIDC → AWS; `develop` → `dev`, `main` → `prod`).
+The code, API messages and documentation are in **English**. The web UI is **English by default** and can be
+switched to **Spanish** with the language button (EN / ES) in the app bar, on the sign-in page and after
+signing in. The choice is stored in the browser (`localStorage`, key `tf.lang`) and also drives the language of the
+optional Bedrock summary. The Spanish documentation lives in [`docs-es/`](docs-es/README.md).
 
-> **Nota**: desde la sesión de desarrollo automatizado **no fue posible** crear los *environments*,
-> variables/secrets ni reglas de protección de ramas en GitHub (la integración no expone esas APIs). Está
-> todo documentado con los comandos exactos para que los ejecutes tú.
-
----
-
-## Limitaciones conocidas
-
-* **Solo state v4** (Terraform 0.12 → 1.x y OpenTofu). Los formatos anteriores se registran con `parse_error`.
-* **Búsqueda sobre la versión vigente** de cada state (no sobre el historial completo): guardar recursos de cada versión multiplicaría el costo de escritura. El detalle, diff y grafo de **cualquier versión** sí se calculan bajo demanda desde S3. Tipo y nombre son coincidencias exactas; buscar solo por atributo usa un `Scan` filtrado y acotado.
-* **Versiones de providers**: el state v4 no las incluye; se muestran los providers en uso. (Los `version_constraint` llegan solo con planes enviados.)
-* **Un único bucket de states** por despliegue (despliega otro stack para otro bucket).
-* Estados muy grandes (> `MaxStateBytes`, 40 MB por defecto) no se parsean.
-* La ingesta no serializa por proyecto salvo que fijes `IngestReservedConcurrency=1`; en una carrera improbable entre dos versiones simultáneas, la reconciliación semanal corrige los ítems de recursos.
-* `S3 → EventBridge` entrega *at-least-once* y sin garantía de orden; el diseño lo tolera (idempotencia + orden por `LastModified`/serial), pero versiones del mismo segundo se ordenan por serial.
-* Cognito no está integrado con un IdP externo (se pueden agregar manualmente) y no hay dominio propio para CloudFront (usa `*.cloudfront.net`).
-* Los *environments* de GitHub no se pudieron crear automáticamente (ver arriba).
+Strings are in `frontend/lib/l10n/app_strings.dart`; every string is declared with its English and Spanish text
+side by side, so a missing translation fails at compile time.
 
 ---
 
-Licencia: [Apache-2.0](LICENSE). Reconocimientos: [NOTICE](NOTICE).
+## Gitflow, CI/CD and environments
+
+The branch flow (`main` = prod, `develop` = dev, `feature/*`), the GitHub *environments*
+(`dev`, `prod`) with their variables and secrets, and the `gh` commands to create them are in
+[`docs/GITFLOW.md`](docs/GITFLOW.md). Workflows: `.github/workflows/ci.yml` (backend, templates, frontend)
+and `deploy.yml` (OIDC → AWS; `develop` → `dev`, `main` → `prod`).
+
+> **Note**: GitHub *environments*, variables/secrets and branch protection rules are repository settings
+> that must be created by a repository admin. Everything is documented with the exact commands.
+
+---
+
+## Known limitations
+
+* **v4 state only** (Terraform 0.12 → 1.x and OpenTofu). Earlier formats are recorded with `parse_error`.
+* **Search covers the current version** of each state (not the full history): storing resources for every version would multiply the write cost. The detail, diff and graph of **any version** are computed on demand from S3. Type and name are exact matches; searching by attribute alone uses a filtered, bounded `Scan`.
+* **Provider versions**: the v4 state does not include them; the providers in use are shown. (`version_constraint` arrives only with submitted plans.)
+* **A single states bucket** per deployment (deploy another stack for another bucket).
+* Very large states (> `MaxStateBytes`, 40 MB by default) are not parsed.
+* Ingestion is not serialized per project unless you set `IngestReservedConcurrency=1`; in an unlikely race between two simultaneous versions, the weekly reconciliation fixes the resource items.
+* `S3 → EventBridge` delivers *at-least-once* with no ordering guarantee; the design tolerates it (idempotency + ordering by `LastModified`/serial), but versions within the same second are ordered by serial.
+* Cognito is not integrated with an external IdP (they can be added manually) and there is no custom domain for CloudFront (it uses `*.cloudfront.net`).
+
+---
+
+License: [Apache-2.0](LICENSE). Acknowledgements: [NOTICE](NOTICE).

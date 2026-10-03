@@ -9,6 +9,7 @@ import '../../core/state_ref.dart';
 import '../../shared/format.dart';
 import '../../shared/theme.dart';
 import '../../shared/widgets.dart';
+import '../../l10n/app_strings.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -34,27 +35,28 @@ class _Content extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Dashboard', style: Theme.of(context).textTheme.headlineMedium),
+      Text(s.navDashboard, style: Theme.of(context).textTheme.headlineMedium),
       const SizedBox(height: 16),
       LayoutBuilder(builder: (context, c) {
         final cols = c.maxWidth > 900 ? 4 : (c.maxWidth > 520 ? 2 : 1);
         final w = (c.maxWidth - (cols - 1) * 12) / cols;
         Widget tile(Widget child) => SizedBox(width: w, child: child);
         return Wrap(spacing: 12, runSpacing: 12, children: [
-          tile(StatCard(label: 'Proyectos (${d.states} states)', value: '${d.projects}', icon: Icons.folder_copy_outlined)),
+          tile(StatCard(label: s.projectsWithStates(d.states), value: '${d.projects}', icon: Icons.folder_copy_outlined)),
           tile(StatCard(
-              label: 'Recursos', value: compact(d.resources), icon: Icons.dns_outlined, color: Palette.of(1))),
+              label: s.resources, value: compact(d.resources), icon: Icons.dns_outlined, color: Palette.of(1))),
           tile(StatCard(
-              label: 'Versiones', value: compact(d.versions), icon: Icons.history, color: Palette.of(4))),
+              label: s.versions, value: compact(d.versions), icon: Icons.history, color: Palette.of(4))),
           tile(StatCard(
-            label: 'Proyectos bloqueados',
+            label: s.lockedProjects,
             value: '${d.locked}',
             icon: d.locked == 0 ? Icons.lock_open : Icons.lock,
             color: d.lockAlerts > 0
                 ? Palette.locked
                 : (d.locked > 0 ? Palette.modified : Palette.released),
-            subtitle: d.lockAlerts > 0 ? '${d.lockAlerts} sobre ${d.lockThresholdMinutes} min' : null,
+            subtitle: d.lockAlerts > 0 ? s.lockAlertOver(d.lockAlerts, d.lockThresholdMinutes) : null,
           )),
         ]);
       }),
@@ -64,33 +66,33 @@ class _Content extends StatelessWidget {
         const SizedBox(height: 16),
       ],
       _TwoCol(
-        left: SectionCard(title: 'Actividad (versiones y locks por día)', child: _ActivityChart(d.activity)),
-        right: SectionCard(title: 'Recursos por tipo', child: BarList(d.byType)),
+        left: SectionCard(title: s.activityTitle, child: _ActivityChart(d.activity)),
+        right: SectionCard(title: s.resourcesByType, child: BarList(d.byType)),
       ),
       const SizedBox(height: 16),
       _TwoCol(
-        left: SectionCard(title: 'Recursos por provider', child: Donut(d.byProvider)),
-        right: SectionCard(title: 'Recursos por módulo', child: BarList(d.byModule)),
+        left: SectionCard(title: s.resourcesByProvider, child: Donut(d.byProvider)),
+        right: SectionCard(title: s.resourcesByModule, child: BarList(d.byModule)),
       ),
       const SizedBox(height: 16),
       _TwoCol(
-        left: SectionCard(title: 'Recursos por proyecto', child: BarList(d.byProject)),
+        left: SectionCard(title: s.resourcesByProject, child: BarList(d.byProject)),
         right: SectionCard(
-          title: 'Versiones de Terraform en uso',
+          title: s.terraformVersionsInUse,
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Wrap(spacing: 8, runSpacing: 8, children: [
               for (final e in d.terraformVersions.entries)
-                Tag('${e.key} · ${e.value} proy.', icon: Icons.terminal, color: Palette.of(0)),
+                Tag(s.versionProjects(e.key, e.value), icon: Icons.terminal, color: Palette.of(0)),
             ]),
             const SizedBox(height: 14),
-            Text('Providers en uso', style: Theme.of(context).textTheme.labelLarge),
+            Text(s.providersInUse, style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 6),
             Wrap(spacing: 8, runSpacing: 8, children: [
               for (final p in d.providersInUse) Tag(p, icon: Icons.extension_outlined, color: Palette.of(1)),
             ]),
             const SizedBox(height: 6),
             Text(
-              'El state no registra la versión de cada provider; se muestran los providers en uso.',
+              s.providerVersionNote,
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ]),
@@ -98,14 +100,14 @@ class _Content extends StatelessWidget {
       ),
       const SizedBox(height: 16),
       SectionCard(
-        title: 'Modificados recientemente',
+        title: s.recentlyModified,
         child: Column(children: [
           for (final p in d.recent)
             ListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
               title: Text(p.label),
-              subtitle: Text('${relativeTime(p.lastModified)} · serial ${p.serial ?? '—'} · TF ${p.terraformVersion ?? '—'}'),
+              subtitle: Text('${relativeTime(s, p.lastModified)} · serial ${p.serial ?? '—'} · TF ${p.terraformVersion ?? '—'}'),
               trailing: LockBadge(lock: p.lock, dense: true),
               onTap: () => context.go(stateLocation(p.stateRef)),
             ),
@@ -139,6 +141,7 @@ class _LocksCard extends StatelessWidget {
   final DashboardData d;
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
     return Card(
       color: d.lockAlerts > 0 ? Palette.locked.withValues(alpha: 0.08) : null,
       child: Padding(
@@ -147,7 +150,7 @@ class _LocksCard extends StatelessWidget {
           Row(children: [
             Icon(d.lockAlerts > 0 ? Icons.warning_amber_rounded : Icons.lock, color: Palette.locked),
             const SizedBox(width: 8),
-            Text('Proyectos bloqueados', style: Theme.of(context).textTheme.titleMedium),
+            Text(s.lockedProjects, style: Theme.of(context).textTheme.titleMedium),
           ]),
           const SizedBox(height: 8),
           for (final l in d.locks)
@@ -158,8 +161,8 @@ class _LocksCard extends StatelessWidget {
                   color: l.alert ? Palette.locked : Palette.modified),
               title: Text(stateLabel(l.stateRef)),
               subtitle: Text(
-                  '${l.who} · ${l.operation.replaceFirst('OperationType', '')} · desde ${relativeTime(l.since)}'),
-              trailing: l.alert ? const Tag('Alerta', color: Palette.locked) : null,
+                  s.whoSince(l.who, l.operation.replaceFirst('OperationType', ''), relativeTime(s, l.since))),
+              trailing: l.alert ? Tag(s.alertTag, color: Palette.locked) : null,
               onTap: () => context.go(stateLocation(l.stateRef, extra: {'tab': 'locks'})),
             ),
         ]),
@@ -222,22 +225,22 @@ class _ActivityChart extends StatelessWidget {
       ),
       const SizedBox(height: 8),
       Row(children: [
-        Tag('Versiones', color: Palette.of(0)),
+        Tag(context.s.versions, color: Palette.of(0)),
         const SizedBox(width: 8),
-        Tag('Locks', color: Palette.of(3)),
+        Tag(context.s.navLocks, color: Palette.of(3)),
       ]),
     ]);
   }
 }
 
-/// Barras horizontales ordenadas (valor máximo = 100 %).
+/// Sorted horizontal bars (maximum value = 100 %).
 class BarList extends StatelessWidget {
   const BarList(this.data, {super.key});
   final Map<String, int> data;
 
   @override
   Widget build(BuildContext context) {
-    if (data.isEmpty) return const Text('Sin datos');
+    if (data.isEmpty) return Text(context.s.noData);
     final entries = data.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     final maxV = entries.first.value.clamp(1, 1 << 30);
     return Column(children: [
@@ -273,7 +276,7 @@ class Donut extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (data.isEmpty) return const Text('Sin datos');
+    if (data.isEmpty) return Text(context.s.noData);
     final entries = data.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     final total = entries.fold<int>(0, (s, e) => s + e.value);
     return Row(children: [
